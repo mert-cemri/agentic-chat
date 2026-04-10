@@ -1,0 +1,26 @@
+# Runtime state
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Local/ephemeral config (the checked-in relay.config.json is a template;
+# rename or override locally as needed)
+relay.config.local.json
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs
+*.log

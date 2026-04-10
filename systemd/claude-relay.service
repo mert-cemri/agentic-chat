@@ -1,0 +1,15 @@
+[Unit]
+Description=Claude Relay Server
+After=network.target
+
+[Service]
+Type=simple
+User=relay
+WorkingDirectory=/opt/claude-relay
+ExecStart=/usr/bin/python3 relay.py serve
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

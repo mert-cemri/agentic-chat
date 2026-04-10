@@ -1,0 +1,13 @@
+{
+  "port": 4444,
+  "host": "0.0.0.0",
+  "db_path": "./data/relay.db",
+  "heartbeat_timeout_seconds": 120,
+  "message_retention_days": 7,
+  "max_message_length": 50000,
+  "cleanup_batch_size": 5000,
+  "max_receive_response_bytes": 102400,
+  "rate_limit_burst": 30,
+  "rate_limit_refill_per_sec": 5.0,
+  "public_url": null
+}

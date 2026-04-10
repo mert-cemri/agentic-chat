@@ -1,0 +1,10 @@
+relay.yourdomain.com {
+    reverse_proxy localhost:4444
+
+    # Optional: restrict to known IPs
+    # @blocked not remote_ip 1.2.3.4 5.6.7.8
+    # respond @blocked 403
+
+    # Optional: proxy-level rate limiting (first line of defense)
+    # rate_limit {remote.ip} 30r/s
+}

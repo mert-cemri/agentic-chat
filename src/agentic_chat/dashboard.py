@@ -63,10 +63,18 @@ async def join_page(request: Request) -> Response:
         f"-- relay {relay_url}"
     )
 
+    # Build the dashboard URL for the join page
+    configured_base = CONFIG.get("public_url") if CONFIG else None
+    if configured_base:
+        dashboard_url = configured_base.rstrip("/") + "/dashboard"
+    else:
+        dashboard_url = f"{request.url.scheme}://{request.url.netloc}/dashboard"
+
     html = _load_template("join.html").format(
         relay_name=row["namespace"],
         peer_name=row["peer_name"],
         mcp_command=mcp_command,
+        dashboard_url=dashboard_url,
     )
     return HTMLResponse(html)
 

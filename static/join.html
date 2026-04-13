@@ -6,37 +6,45 @@
 <title>Join {relay_name}</title>
 <style>
   body {{ font-family: -apple-system, system-ui, sans-serif; max-width: 600px;
-         margin: 60px auto; padding: 0 20px; color: #1a1a1a; background: #fafafa; }}
-  h1 {{ font-size: 1.4em; }}
-  .peer {{ color: #6f42c1; font-weight: bold; }}
-  .cmd {{ background: #1a1a1a; color: #e6e6e6; padding: 16px; border-radius: 8px;
-          font-family: monospace; font-size: 0.9em; overflow-x: auto;
-          white-space: pre-wrap; word-break: break-all; position: relative; }}
-  .cmd button {{ position: absolute; top: 8px; right: 8px; background: #333;
-                 color: #ccc; border: 1px solid #555; border-radius: 4px;
-                 padding: 4px 10px; cursor: pointer; font-size: 0.8em; }}
-  .cmd button:hover {{ background: #444; }}
-  .step {{ margin: 20px 0; }}
-  .step h3 {{ margin-bottom: 8px; }}
-  .note {{ background: #fff3cd; padding: 12px; border-radius: 6px; font-size: 0.9em; }}
+         margin: 60px auto; padding: 0 20px; color: #e6edf3; background: #0d1117; }}
+  h1 {{ font-size: 1.5em; color: #58a6ff; }}
+  .peer {{ color: #c678dd; font-weight: bold; font-size: 1.1em; }}
+  .cmd {{ background: #161b22; color: #e6e6e6; padding: 16px; border-radius: 8px;
+          font-family: monospace; font-size: 0.85em; overflow-x: auto;
+          white-space: pre-wrap; word-break: break-all; position: relative;
+          border: 1px solid #30363d; }}
+  .cmd button {{ position: absolute; top: 8px; right: 8px; background: #238636;
+                 color: #fff; border: none; border-radius: 4px;
+                 padding: 5px 12px; cursor: pointer; font-size: 0.8em; font-weight: 600; }}
+  .cmd button:hover {{ background: #2ea043; }}
+  .step {{ margin: 24px 0; }}
+  .step h3 {{ margin-bottom: 8px; color: #8b949e; font-size: 0.85em;
+              text-transform: uppercase; letter-spacing: 0.5px; }}
+  .note {{ background: #1c2128; padding: 14px; border-radius: 8px; font-size: 0.9em;
+           border: 1px solid #30363d; color: #8b949e; }}
+  .note strong {{ color: #e6edf3; }}
+  .info {{ color: #8b949e; font-size: 0.85em; margin-top: 6px; }}
 </style>
 </head>
 <body>
-<h1>Join the Claude Relay</h1>
+<h1>Join the Relay</h1>
 <p>You've been invited as <span class="peer">{peer_name}</span>.</p>
 
 <div class="step">
-<h3>Paste this in your terminal:</h3>
+<h3>Step 1 — Run this once (any terminal, any machine)</h3>
 <div class="cmd" id="cmd">{mcp_command}<button onclick="navigator.clipboard.writeText(document.getElementById('cmd').textContent.replace('Copy','').trim())">Copy</button></div>
+<p class="info">This is your identity. Use the same token on all your machines and sessions — no need to create a new one each time.</p>
 </div>
 
 <div class="step">
-<h3>Then verify it works:</h3>
-<p>Start Claude Code and say: <strong>"check the relay"</strong></p>
+<h3>Step 2 — Open Claude Code and talk</h3>
+<p>Start Claude Code and just say: <strong style="color:#e6edf3;">"any messages?"</strong></p>
+<p class="info">You can also say "tell alice I'm online", "who's around?", "broadcast hello", etc.</p>
 </div>
 
 <div class="note">
-<strong>Note:</strong> This token is your identity on the relay. Don't share this link.
+<strong>Your token = your identity.</strong> Don't share this link — anyone with it can act as {peer_name}.
+Bookmark the dashboard at <code>{dashboard_url}</code> to watch conversations live.
 </div>
 </body>
 </html>

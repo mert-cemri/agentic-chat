@@ -105,25 +105,23 @@ def cmd_token_create(args: argparse.Namespace) -> None:
 
     relay_url = args.url if hasattr(args, "url") and args.url else None
 
-    print(f"\nToken for '{name}' in namespace '{namespace}':")
+    print(f"\nToken for '{name}':")
     print(f"  {raw_token}")
+    print(f"\n  This is {name}'s identity. One token per person — use it on")
+    print(f"  every machine and every Claude Code session. Run once per machine:")
 
     if relay_url:
+        mcp_url = f"{relay_url.rstrip('/')}/mcp"
         join_link = f"{relay_url.rstrip('/')}/join/{raw_token}"
-        print(f"\nSend this link to {name}:")
+        print(f"\n  claude mcp add -t http -H \"Authorization: Bearer {raw_token}\" -- relay {mcp_url}")
+        print(f"\n  Or send them this join link (they open it, copy one command):")
         print(f"  {join_link}")
-        print(f"\nThey open it in a browser, copy one command, done.")
     else:
-        print(f"\nGive them this command to connect:")
-        print(f"  claude mcp add --transport http \\")
-        print(f'    --header "Authorization: Bearer {raw_token}" \\')
-        print(f"    -- relay https://YOUR_RELAY_HOST/mcp")
-        print(f"\n  (the `--` is REQUIRED -- --header is variadic and will")
-        print(f"   otherwise eat the positional 'relay' argument)")
+        print(f"\n  claude mcp add -t http -H \"Authorization: Bearer {raw_token}\" -- relay https://YOUR_HOST/mcp")
         print(f"\n  Tip: use --url to generate a clickable join link:")
-        print(f"  python relay.py token create --name {name} --url https://relay.example.com")
+        print(f"  python relay.py token create --name {name} --url https://your-relay.example.com")
 
-    print(f"\nPost-setup: tell them to say 'check the relay' in Claude Code.")
+    print(f"\n  After setup, just say \"any messages?\" in Claude Code.")
 
 
 def cmd_token_list(args: argparse.Namespace) -> None:
@@ -397,8 +395,8 @@ def _print_demo_box(base_url: str, tokens: dict[str, str], port: int) -> None:
     """Print a formatted demo information box."""
     mcp_url = f"{base_url}/mcp"
     dashboard_url = f"{base_url}/dashboard"
-    dashboard_token = tokens["user1"]
 
+    # Each person gets ONE token. Use it on every machine and session.
     cmd1 = (
         f'claude mcp add --transport http '
         f'-H "Authorization: Bearer {tokens["user1"]}" '
@@ -410,27 +408,27 @@ def _print_demo_box(base_url: str, tokens: dict[str, str], port: int) -> None:
         f'-- relay {mcp_url}'
     )
 
-    # Calculate box width based on longest line
     lines_content = [
         "Agentic Chat Demo",
         "",
-        f"  Dashboard: {dashboard_url}",
-        f"  Dashboard token (user1): {dashboard_token}",
+        f"  Dashboard:  {dashboard_url}",
+        f"  Login token: {tokens['user1']}",
         "",
-        "  -- Connect Claude Code " + "-" * 30,
+        "  -- Connect Claude Code (run once per machine) " + "-" * 10,
         "",
-        "  Terminal 1 (user1):",
+        f"  You (user1) — paste in any terminal:",
         f"  {cmd1}",
         "",
-        "  Terminal 2 (user2):",
+        f"  A friend (user2) — send them this command:",
         f"  {cmd2}",
         "",
-        '  Then in each Claude session, say: "check the relay"',
+        "  One token = one person. Use it on all your sessions & machines.",
+        '  Then just say: "any messages?" in Claude Code.',
         "",
     ]
 
     max_len = max(len(line) for line in lines_content)
-    w = max_len + 4  # padding
+    w = max_len + 4
 
     def pad(text: str) -> str:
         return f"\u2551  {text}{' ' * (w - len(text) - 4)}  \u2551"

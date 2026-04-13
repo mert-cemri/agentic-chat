@@ -24,3 +24,4 @@ venv/
 
 # Logs
 *.log
+src/agentic_chat/__pycache__/

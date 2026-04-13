@@ -8,7 +8,7 @@ import hashlib
 import json
 
 import pytest
-from relay import now_ms
+from agentic_chat.config import now_ms
 
 
 # ------------------------------------------------------------------
@@ -266,7 +266,7 @@ async def test_dashboard_api_rejects_invalid_token(http_client):
     resp = await http_client.get(
         "/dashboard/api", headers={"Authorization": "Bearer relay_tok_bogus"}
     )
-    # Dashboard endpoint handles its own auth — both missing and invalid return 401
+    # Dashboard endpoint handles its own auth -- both missing and invalid return 401
     assert resp.status_code == 401
 
 

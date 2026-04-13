@@ -9,7 +9,8 @@ import hashlib
 import json
 
 import pytest
-from relay import now_ms, TokenAuthMiddleware
+from agentic_chat.config import now_ms
+from agentic_chat.auth import TokenAuthMiddleware
 
 
 async def seed_peer(db, name: str, ns: str = "default") -> str:
@@ -33,7 +34,7 @@ async def test_sql_injection_in_channel_name(test_db, mcp_client):
     """Channel name validation regex blocks any character that could enable
     SQL injection (quotes, semicolons, backticks). Note: even if a channel
     name passed through (e.g. 'general--'), parameterized queries would
-    prevent injection — this is defense-in-depth."""
+    prevent injection -- this is defense-in-depth."""
     tok = await seed_peer(test_db, "attacker")
     client = mcp_client(tok, "attacker")
     await client.initialize()
@@ -69,7 +70,7 @@ async def test_sql_injection_in_message_content(test_db, mcp_client):
     r = await client.call_tool("send", {"channel": "general", "content": payload})
     assert r["ok"] is True  # content can be arbitrary text
 
-    # Receive it back — should be the literal string
+    # Receive it back -- should be the literal string
     reader_tok = await seed_peer(test_db, "reader")
     reader = mcp_client(reader_tok, "reader")
     await reader.initialize()
@@ -104,14 +105,14 @@ async def test_cannot_read_other_namespace_messages(test_db, mcp_client):
     await alice.call_tool("send", {"channel": "secrets", "content": "team-a secret"})
     await mallory.call_tool("send", {"channel": "secrets", "content": "team-b content"})
 
-    # Alice reads — should only see team-a secret
+    # Alice reads -- should only see team-a secret
     r = await alice.call_tool("receive", {"channel": "secrets"})
     assert r["ok"] is True
     assert len(r["messages"]) == 1
     assert r["messages"][0]["content"] == "team-a secret"
     assert r["messages"][0]["from"] == "alice"
 
-    # Mallory reads — should only see team-b content
+    # Mallory reads -- should only see team-b content
     r = await mallory.call_tool("receive", {"channel": "secrets"})
     assert r["ok"] is True
     assert len(r["messages"]) == 1
@@ -248,11 +249,11 @@ async def test_bearer_prefix_variations(test_db, http_client):
 @pytest.mark.asyncio
 async def test_token_bucket_allows_initial_burst(test_db, _live_app, http_client):
     """Token bucket should allow a burst of requests (MCP init + tool calls)."""
-    import relay as relay_module
+    import agentic_chat.config as config_module
 
     # Configure a small bucket we can actually exhaust in a test
-    relay_module.CONFIG["rate_limit_burst"] = 5
-    relay_module.CONFIG["rate_limit_refill_per_sec"] = 1.0
+    config_module.CONFIG["rate_limit_burst"] = 5
+    config_module.CONFIG["rate_limit_refill_per_sec"] = 1.0
     _live_app._buckets.clear()
 
     try:
@@ -282,19 +283,19 @@ async def test_token_bucket_allows_initial_burst(test_db, _live_app, http_client
         assert "Too many requests" in r.json()["error"]
 
     finally:
-        relay_module.CONFIG["rate_limit_burst"] = 100_000
-        relay_module.CONFIG["rate_limit_refill_per_sec"] = 100_000.0
+        config_module.CONFIG["rate_limit_burst"] = 100_000
+        config_module.CONFIG["rate_limit_refill_per_sec"] = 100_000.0
         _live_app._buckets.clear()
 
 
 @pytest.mark.asyncio
 async def test_token_bucket_refills_over_time(test_db, _live_app, http_client):
     """After the burst is exhausted, waiting should refill the bucket."""
-    import relay as relay_module
+    import agentic_chat.config as config_module
 
     # Small bucket, fast refill so the test is quick
-    relay_module.CONFIG["rate_limit_burst"] = 2
-    relay_module.CONFIG["rate_limit_refill_per_sec"] = 20.0  # 50ms per token
+    config_module.CONFIG["rate_limit_burst"] = 2
+    config_module.CONFIG["rate_limit_refill_per_sec"] = 20.0  # 50ms per token
     _live_app._buckets.clear()
 
     try:
@@ -334,8 +335,8 @@ async def test_token_bucket_refills_over_time(test_db, _live_app, http_client):
         assert r.status_code != 429
 
     finally:
-        relay_module.CONFIG["rate_limit_burst"] = 100_000
-        relay_module.CONFIG["rate_limit_refill_per_sec"] = 100_000.0
+        config_module.CONFIG["rate_limit_burst"] = 100_000
+        config_module.CONFIG["rate_limit_refill_per_sec"] = 100_000.0
         _live_app._buckets.clear()
 
 
@@ -343,7 +344,7 @@ async def test_token_bucket_refills_over_time(test_db, _live_app, http_client):
 async def test_rate_limiter_bucket_dict_bounded(_live_app):
     """Bucket dict cleanup runs without crashing on many entries."""
     import time
-    from relay import TokenBucket
+    from agentic_chat.auth import TokenBucket
 
     _live_app._buckets.clear()
 
@@ -366,7 +367,7 @@ async def test_rate_limiter_bucket_dict_bounded(_live_app):
 
 def test_token_bucket_unit():
     """Unit test for TokenBucket math."""
-    from relay import TokenBucket
+    from agentic_chat.auth import TokenBucket
 
     bucket = TokenBucket(capacity=3, refill_rate=10.0, now=0.0)
     # Can consume 3 initially
@@ -382,7 +383,7 @@ def test_token_bucket_unit():
     # After 0.3s total -> should have refilled to 2 tokens (from last_refill=0.1)
     assert bucket.try_consume(0.3) is True
     assert bucket.try_consume(0.3) is True
-    # Cap at capacity — long wait doesn't overflow
+    # Cap at capacity -- long wait doesn't overflow
     assert bucket.try_consume(100.0) is True
     assert bucket.try_consume(100.0) is True
     assert bucket.try_consume(100.0) is True
@@ -423,7 +424,7 @@ async def test_can_send_to_dm_as_non_participant(test_db, mcp_client):
         "channel": "dm-alice-bob",
         "content": "snooping",
     })
-    assert r["ok"] is True  # allowed by design — DMs are not private
+    assert r["ok"] is True  # allowed by design -- DMs are not private
 
     # Alice can read it
     r = await alice.call_tool("receive", {"channel": "dm-alice-bob"})

@@ -8,7 +8,9 @@ import hashlib
 import time
 
 import pytest
-from relay import RelayDB, now_ms, ms_to_iso, normalize_channel
+from agentic_chat.db import RelayDB
+from agentic_chat.config import now_ms, ms_to_iso
+from agentic_chat.channels import normalize_channel
 
 
 async def create_peer(db: RelayDB, name: str, ns: str = "default") -> str:

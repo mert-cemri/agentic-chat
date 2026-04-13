@@ -1,7 +1,8 @@
 """Tests for the database layer."""
 
 import pytest
-from relay import RelayDB, now_ms
+from agentic_chat.db import RelayDB
+from agentic_chat.config import now_ms
 
 
 @pytest.mark.asyncio

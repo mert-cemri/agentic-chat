@@ -4,7 +4,8 @@ import hashlib
 import time
 
 import pytest
-from relay import now_ms, normalize_channel, PEER_NAME_RE, CHANNEL_NAME_RE
+from agentic_chat.config import now_ms
+from agentic_chat.channels import normalize_channel, PEER_NAME_RE, CHANNEL_NAME_RE
 
 
 # -- Token hashing tests --

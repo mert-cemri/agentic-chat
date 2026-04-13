@@ -3,7 +3,7 @@
 import hashlib
 
 import pytest
-from relay import now_ms
+from agentic_chat.config import now_ms
 
 
 async def seed_peer(db, name: str, ns: str = "default") -> str:
@@ -34,14 +34,14 @@ async def test_unicode_messages(test_db, mcp_client):
 
     test_messages = [
         "Hello, world!",
-        "שלום עולם",  # Hebrew (RTL)
-        "こんにちは世界",  # Japanese
-        "你好，世界",  # Chinese
-        "مرحبا بالعالم",  # Arabic (RTL)
-        "Привет, мир",  # Cyrillic
-        "🚀🎉👋 emoji test 🌈",
-        "Mixed: Hello 世界 🌍 שלום",
-        "Math: ∀x∈ℝ: x²≥0",
+        "\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd",  # Hebrew (RTL)
+        "\u3053\u3093\u306b\u3061\u306f\u4e16\u754c",  # Japanese
+        "\u4f60\u597d\uff0c\u4e16\u754c",  # Chinese
+        "\u0645\u0631\u062d\u0628\u0627 \u0628\u0627\u0644\u0639\u0627\u0644\u0645",  # Arabic (RTL)
+        "\u041f\u0440\u0438\u0432\u0435\u0442, \u043c\u0438\u0440",  # Cyrillic
+        "\U0001f680\U0001f389\U0001f44b emoji test \U0001f308",
+        "Mixed: Hello \u4e16\u754c \U0001f30d \u05e9\u05dc\u05d5\u05dd",
+        "Math: \u2200x\u2208\u211d: x\u00b2\u22650",
         "Code: `const x = { foo: 'bar' };`",
     ]
     for msg in test_messages:
@@ -61,7 +61,7 @@ async def test_unicode_status_message(test_db, mcp_client):
     client = mcp_client(tok, "alice")
     await client.initialize()
 
-    status = "🔥 deep in a refactor 🛠️"
+    status = "\U0001f525 deep in a refactor \U0001f6e0\ufe0f"
     r = await client.call_tool("heartbeat", {"status_message": status})
     assert r["ok"] is True
 
@@ -197,15 +197,15 @@ async def test_since_id_does_not_advance_cursor(test_db, mcp_client):
     for i in range(5):
         await sender.call_tool("send", {"channel": "general", "content": f"m{i}"})
 
-    # Use since_id=0 — does NOT advance cursor
+    # Use since_id=0 -- does NOT advance cursor
     r = await reader.call_tool("receive", {"channel": "general", "since_id": 0})
     assert r["count"] == 5
 
-    # Normal receive — should still return all 5 (cursor still at 0)
+    # Normal receive -- should still return all 5 (cursor still at 0)
     r = await reader.call_tool("receive", {"channel": "general"})
     assert r["count"] == 5
 
-    # Normal receive again — now empty
+    # Normal receive again -- now empty
     r = await reader.call_tool("receive", {"channel": "general"})
     assert r["count"] == 0
 
@@ -249,11 +249,11 @@ async def test_peek_does_not_advance_cursor(test_db, mcp_client):
     r = await reader.call_tool("receive", {"channel": "general", "peek": True})
     assert r["count"] == 2
 
-    # Peek again — still 2
+    # Peek again -- still 2
     r = await reader.call_tool("receive", {"channel": "general", "peek": True})
     assert r["count"] == 2
 
-    # Normal read — still 2 (cursor didn't advance during peeks)
+    # Normal read -- still 2 (cursor didn't advance during peeks)
     r = await reader.call_tool("receive", {"channel": "general"})
     assert r["count"] == 2
 

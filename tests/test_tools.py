@@ -1,4 +1,4 @@
-"""Tests for MCP tool handlers — unit tests using direct DB calls.
+"""Tests for MCP tool handlers -- unit tests using direct DB calls.
 
 These tests call the tool logic directly against the DB without going through
 MCP protocol. They test the SQL queries, business logic, and return formats.
@@ -8,7 +8,9 @@ import hashlib
 import time
 
 import pytest
-from relay import RelayDB, now_ms, ms_to_iso, normalize_channel, CONFIG, DEFAULT_CONFIG
+from agentic_chat.db import RelayDB
+from agentic_chat.config import now_ms, ms_to_iso, CONFIG, DEFAULT_CONFIG
+from agentic_chat.channels import normalize_channel
 
 
 # -- Helper to simulate a tool call context --

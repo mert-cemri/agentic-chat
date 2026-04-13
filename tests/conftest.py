@@ -7,11 +7,13 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-# Add parent dir to path so we can import relay
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add src dir to path so we can import the package
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-import relay as relay_module
-from relay import RelayDB, SCHEMA_SQL, now_ms, DEFAULT_CONFIG
+import agentic_chat.config as config_module
+import agentic_chat.db as db_module
+from agentic_chat.db import RelayDB, SCHEMA_SQL
+from agentic_chat.config import now_ms, DEFAULT_CONFIG
 
 
 @pytest_asyncio.fixture
@@ -28,12 +30,12 @@ async def test_db(tmp_path):
     await d.connect(db_path)
 
     # Replace the module-level singleton so tool handlers use this DB
-    original_db = relay_module.db
-    relay_module.db = d
+    original_db = db_module.db
+    db_module.db = d
 
     yield d
 
-    relay_module.db = original_db
+    db_module.db = original_db
     await d.close()
 
 
@@ -64,9 +66,9 @@ async def seeded_db(test_db):
 @pytest.fixture(autouse=True)
 def set_config():
     """Ensure CONFIG is populated for all tests."""
-    relay_module.CONFIG = dict(DEFAULT_CONFIG)
+    config_module.CONFIG.update(DEFAULT_CONFIG)
     yield
-    relay_module.CONFIG = {}
+    config_module.CONFIG.clear()
 
 
 # ------------------------------------------------------------------
@@ -91,7 +93,8 @@ async def _live_app():
     """
     from asgi_lifespan import LifespanManager
     from mcp.server.fastmcp.server import TransportSecuritySettings
-    from relay import mcp, TokenAuthMiddleware
+    from agentic_chat.server import mcp
+    from agentic_chat.auth import TokenAuthMiddleware
 
     # Disable DNS rebinding protection for ASGI test transport
     mcp.settings.transport_security = TransportSecuritySettings(
@@ -125,8 +128,8 @@ async def http_client(test_db, _live_app):
     _live_app._buckets.clear()
     # Make sure CONFIG has the large test burst (in case a previous test
     # changed rate_limit_burst or rate_limit_refill_per_sec)
-    relay_module.CONFIG["rate_limit_burst"] = 100_000
-    relay_module.CONFIG["rate_limit_refill_per_sec"] = 100_000.0
+    config_module.CONFIG["rate_limit_burst"] = 100_000
+    config_module.CONFIG["rate_limit_refill_per_sec"] = 100_000.0
 
     transport = httpx.ASGITransport(app=_live_app)
     async with httpx.AsyncClient(

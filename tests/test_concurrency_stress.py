@@ -8,7 +8,7 @@ import asyncio
 import hashlib
 
 import pytest
-from relay import now_ms
+from agentic_chat.config import now_ms
 
 
 async def seed_peer(db, name: str, ns: str = "default") -> str:
@@ -113,7 +113,7 @@ async def test_concurrent_receives_cursor_no_regression(test_db, mcp_client):
     for i in range(20, 25):
         await sender.call_tool("send", {"channel": "general", "content": f"m{i}"})
 
-    # reader1 should only see the new 5 — cursor must still be at 20
+    # reader1 should only see the new 5 -- cursor must still be at 20
     r3 = await reader1.call_tool("receive", {"channel": "general", "limit": 20})
     assert r3["ok"] is True
     contents = [m["content"] for m in r3["messages"]]
@@ -147,7 +147,7 @@ async def test_cursor_max_via_db_upsert(test_db):
         (ns, ch_id),
     )
 
-    # Try to regress to 30 — should stay at 50
+    # Try to regress to 30 -- should stay at 50
     await test_db.execute(
         "INSERT INTO cursors (namespace, peer_name, channel_id, last_read_id) "
         "VALUES (?, 'alice', ?, 30) "
@@ -161,7 +161,7 @@ async def test_cursor_max_via_db_upsert(test_db):
     )
     assert row["last_read_id"] == 50
 
-    # Advance to 80 — should advance
+    # Advance to 80 -- should advance
     await test_db.execute(
         "INSERT INTO cursors (namespace, peer_name, channel_id, last_read_id) "
         "VALUES (?, 'alice', ?, 80) "

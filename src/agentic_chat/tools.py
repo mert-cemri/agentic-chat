@@ -24,9 +24,34 @@ async def heartbeat(
     status_message: str | None = None,
     ctx: Context = None,  # type: ignore[assignment]
 ) -> dict:
-    """Check in with the relay. Returns who's online and unread message counts.
-    Call this when the user asks about the relay or wants to check messages.
-    Optionally update your status message (e.g. 'working on auth module')."""
+    """Check in with the relay, see who is online, and get unread message counts per channel.
+
+    WHEN TO CALL THIS TOOL:
+    - User says "any messages?", "check the relay", "what's happening?", "relay status"
+    - User says "who's online?", "who's around?" (this tool covers that too, but list_peers gives more detail)
+    - As the FIRST step before calling receive -- heartbeat tells you WHERE unreads are so you know which channels to read
+    - Anytime the user asks you to check in or see what is new
+
+    WHAT IT RETURNS:
+    - your identity (peer_name, namespace) -- confirms who you are on the relay
+    - a list of other peers with their online/offline status and optional status messages
+    - an unread_summary with total_unread count and a per-channel breakdown of unread counts
+    - calling this also marks you as "online" so other peers can see you are active
+
+    WHEN TO USE THIS VS OTHER TOOLS:
+    - Use heartbeat FIRST, then call receive if unread counts are > 0
+    - If the user only wants to know about people (not messages), list_peers is more focused
+    - If the user wants to read actual message content, you need receive after this
+
+    PARAMETERS:
+    - status_message (optional): a short string (max 200 chars) that other peers see, e.g. "working on auth module", "in a meeting"
+
+    EXAMPLES:
+    - User says "any messages?" -> call heartbeat, check unread_summary, then call receive if total_unread > 0
+    - User says "check the relay" -> call heartbeat, summarize peers online and unread counts
+    - User says "set my status to working on frontend" -> call heartbeat with status_message="working on frontend"
+    - User says "who's online?" -> call heartbeat (or list_peers), report the peers list
+    """
     caller = get_caller(ctx)
     ns = caller["namespace"]
     me = caller["peer_name"]
@@ -150,9 +175,36 @@ async def send(
     content: str,
     ctx: Context = None,  # type: ignore[assignment]
 ) -> dict:
-    """Send a message to a channel. Channel is auto-created if new.
-    For DMs, use channel='dm-yourname-theirname' (server normalizes the order).
-    For broadcast, use channel='general'."""
+    """Send a message to a channel or DM on the relay. The channel is auto-created if it does not exist yet.
+
+    WHEN TO CALL THIS TOOL:
+    - User says "tell X ...", "message X ...", "send X ...", "reply to X ..."
+    - User says "broadcast ...", "tell everyone ...", "announce ..."
+    - User says "respond to X with ..." or "let X know ..."
+
+    HOW TO CONSTRUCT THE CHANNEL NAME:
+    - For a DM to a specific person: channel="dm-yourname-theirname" (the server sorts the two names alphabetically, so the order you provide does not matter)
+    - For a broadcast to everyone: channel="general"
+    - For a topic channel: channel="some-topic-name" (alphanumeric and hyphens only, 1-64 chars)
+    - Your identity (the sender name) is determined automatically from your auth token -- you never need to ask the user who they are
+
+    WHAT IT RETURNS:
+    - ok: whether the message was sent successfully
+    - message_id: the ID of the sent message
+    - channel: the normalized channel name
+    - timestamp: when the message was created
+
+    PARAMETERS:
+    - channel (required): the channel to send to -- see naming conventions above
+    - content (required): the message text to send (max 50000 chars)
+
+    EXAMPLES:
+    - User says "tell alice I pushed the fix" -> call send(channel="dm-yourname-alice", content="I pushed the fix")
+    - User says "broadcast: standup in 5 minutes" -> call send(channel="general", content="standup in 5 minutes")
+    - User says "reply to bob with sounds good" -> call send(channel="dm-yourname-bob", content="sounds good")
+    - User says "tell everyone the deploy is done" -> call send(channel="general", content="the deploy is done")
+    - User says "message the frontend team: PR is ready" -> call send(channel="frontend-team", content="PR is ready")
+    """
     caller = get_caller(ctx)
     ns = caller["namespace"]
     me = caller["peer_name"]
@@ -247,9 +299,38 @@ async def receive(
     since_id: int | None = None,
     ctx: Context = None,  # type: ignore[assignment]
 ) -> dict:
-    """Read messages from a channel (or all channels if omitted).
-    Returns only unread messages by default. Use peek=true to read without marking as read.
-    Use since_id to re-read historical messages without advancing your cursor."""
+    """Read messages from the relay -- either from a specific channel/DM or from all channels at once.
+
+    WHEN TO CALL THIS TOOL:
+    - User says "check messages", "read messages", "what did X say?", "show me the conversation"
+    - User says "check messages from X", "any messages from alice?", "what's in #general?"
+    - After calling heartbeat and seeing unread counts > 0 -- this is how you fetch the actual message content
+    - User says "read the conversation with bob", "show me what happened in general"
+
+    WHAT IT RETURNS:
+    - A list of messages, each with: id, from (sender name), content, timestamp, and channel (if reading all channels)
+    - count: how many messages were returned
+    - has_more: whether there are additional unread messages beyond the limit
+    - By default, only UNREAD messages are returned and reading them marks them as read (advances your cursor)
+
+    WHEN TO USE THIS VS OTHER TOOLS:
+    - Call heartbeat FIRST to see where unreads are, then call receive to fetch the actual messages
+    - If the user asks "any messages?" do heartbeat first, then receive only if unreads > 0
+    - If the user wants to send a message, use the send tool instead
+
+    PARAMETERS:
+    - channel (optional): omit to get unread messages from ALL channels at once. Set to a specific channel name like "general" or "dm-yourname-theirname" to read only that channel
+    - limit (optional, default 20, max 100): how many messages to fetch
+    - peek (optional, default false): if true, read messages WITHOUT marking them as read -- useful for previewing
+    - since_id (optional): fetch messages after this message ID regardless of your read cursor -- useful for re-reading history. Requires a specific channel
+
+    EXAMPLES:
+    - User says "check messages" -> call receive() with no channel to get all unreads
+    - User says "what did alice say?" -> call receive(channel="dm-yourname-alice")
+    - User says "show me the last 50 messages in general" -> call receive(channel="general", limit=50, since_id=0)
+    - User says "peek at messages without marking read" -> call receive(peek=true)
+    - User says "read messages from bob" -> call receive(channel="dm-yourname-bob")
+    """
     caller = get_caller(ctx)
     ns = caller["namespace"]
     me = caller["peer_name"]
@@ -447,7 +528,27 @@ async def receive(
 async def list_peers(
     ctx: Context = None,  # type: ignore[assignment]
 ) -> dict:
-    """List all peers in your namespace with online/offline status."""
+    """List all peers (other Claude Code instances or users) on the relay with their online/offline status.
+
+    WHEN TO CALL THIS TOOL:
+    - User says "who's on the relay?", "who's online?", "list peers", "who's around?", "show me who's connected"
+    - User asks about people or participants rather than messages
+    - User wants to know if a specific person is available before messaging them
+
+    WHAT IT RETURNS:
+    - A list of all known peers with: name, status (online/offline), status_message (if set), last_seen timestamp, and last_seen_seconds_ago
+    - Total count and online count
+
+    WHEN TO USE THIS VS OTHER TOOLS:
+    - Use this when the user is asking about PEOPLE, not messages
+    - heartbeat also returns a peer list, but list_peers is more focused and does not update your own status
+    - If the user wants messages, use heartbeat + receive instead
+
+    EXAMPLES:
+    - User says "who's online?" -> call list_peers, report who is online and who is offline
+    - User says "is alice around?" -> call list_peers, check alice's status in the result
+    - User says "who's on the relay?" -> call list_peers, summarize the peer list
+    """
     caller = get_caller(ctx)
     ns = caller["namespace"]
 
@@ -509,7 +610,26 @@ async def list_peers(
 async def list_channels(
     ctx: Context = None,  # type: ignore[assignment]
 ) -> dict:
-    """List all channels in your namespace with unread counts and last activity."""
+    """List all channels on the relay with unread counts, message totals, and last activity.
+
+    WHEN TO CALL THIS TOOL:
+    - User says "what channels are there?", "show channels", "list channels", "what groups exist?"
+    - User wants an overview of all available channels before reading or sending
+    - User asks "where is the conversation happening?" or "which channels have activity?"
+
+    WHAT IT RETURNS:
+    - A list of all channels with: name, unread count, total_messages, last_activity timestamp, and last_sender
+    - Total number of channels
+
+    WHEN TO USE THIS VS OTHER TOOLS:
+    - Use this for channel discovery -- to see what channels exist and which have unread messages
+    - If the user wants to read actual messages, use receive after identifying the channel
+    - heartbeat also shows unread counts per channel, but list_channels gives more detail (total messages, last sender, last activity)
+
+    EXAMPLES:
+    - User says "what channels are there?" -> call list_channels, list the channel names and their unread counts
+    - User says "show me active channels" -> call list_channels, highlight channels with recent activity
+    """
     caller = get_caller(ctx)
     ns = caller["namespace"]
     me = caller["peer_name"]

@@ -18,8 +18,12 @@ a:hover{text-decoration:underline}
 .header-logo{color:var(--accent);font-weight:700;font-size:1.1em;white-space:nowrap}
 .header-meta{color:var(--text-secondary);font-size:0.8em;display:flex;align-items:center;gap:8px;margin-left:auto;white-space:nowrap}
 .header-meta .conn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
-.header-meta .conn-dot.ok{background:var(--green)}
-.header-meta .conn-dot.fail{background:var(--red)}
+.header-meta .conn-dot.ok{background:var(--green);animation:pulse-dot 2s ease-in-out infinite}
+.header-meta .conn-dot.fail{background:var(--red);animation:none}
+@keyframes pulse-dot{
+  0%,100%{box-shadow:0 0 0 0 rgba(63,185,80,0.5)}
+  50%{box-shadow:0 0 0 4px rgba(63,185,80,0)}
+}
 .header-user{color:var(--accent);font-weight:600;font-size:0.85em}
 .sign-out-btn{color:var(--text-secondary);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.8em}
 .sign-out-btn:hover{color:var(--text);border-color:var(--text-muted)}
@@ -54,6 +58,8 @@ a:hover{text-decoration:underline}
 .channel-item.broadcast .ch-icon{margin-right:2px}
 .channel-all{color:var(--text-secondary);margin-top:6px;border-top:1px solid var(--border);padding-top:8px}
 
+.sidebar-empty-hint{color:var(--text-muted);font-size:0.8em;padding:8px 6px;line-height:1.4}
+
 /* Messages panel */
 .messages-panel{flex:1;display:flex;flex-direction:column;min-width:0}
 .messages-header{background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:10px 16px;font-weight:600;font-size:0.95em;flex-shrink:0;display:flex;align-items:center;gap:8px}
@@ -75,16 +81,25 @@ a:hover{text-decoration:underline}
 .msg-body pre code{background:none;padding:0;font-size:1em}
 .empty{color:var(--text-muted);text-align:center;padding:40px;font-size:0.9em}
 
+/* First message fade-in animation */
+@keyframes msg-fade-in{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.msg-first-animate{animation:msg-fade-in 0.5s ease-out}
+
 /* Compose */
-.compose{background:var(--bg-secondary);border-top:1px solid var(--border);padding:10px 16px;flex-shrink:0}
+.compose{background:var(--bg-secondary);border-top:1px solid var(--border);padding:12px 16px;flex-shrink:0}
 .compose-row{display:flex;gap:8px;align-items:flex-end}
 .compose-channel{background:var(--bg);color:var(--text-secondary);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.85em;font-family:inherit;width:140px;flex-shrink:0}
 .compose-channel:focus{outline:none;border-color:var(--accent)}
-.compose-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 12px;font-size:0.87em;font-family:inherit;resize:none;min-height:36px;max-height:120px}
-.compose-input:focus{outline:none;border-color:var(--accent)}
-.compose-send{background:var(--green);color:#fff;border:none;border-radius:6px;padding:7px 16px;font-weight:600;cursor:pointer;font-size:0.87em;white-space:nowrap;align-self:flex-end}
+.compose-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:0.9em;font-family:inherit;resize:none;min-height:40px;max-height:120px}
+.compose-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(88,166,255,0.15)}
+.compose-send-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;align-self:flex-end}
+.compose-send{background:var(--green);color:#fff;border:none;border-radius:6px;padding:9px 20px;font-weight:600;cursor:pointer;font-size:0.87em;white-space:nowrap}
 .compose-send:hover{opacity:0.9}
 .compose-send:disabled{opacity:0.5;cursor:not-allowed}
+.compose-hint{color:var(--text-muted);font-size:0.65em;white-space:nowrap}
 
 /* Login */
 .login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000}
@@ -99,13 +114,20 @@ a:hover{text-decoration:underline}
 
 /* Onboarding */
 .onboarding{padding:32px;max-width:600px;margin:0 auto}
-.onboarding h2{color:var(--accent);margin-bottom:12px}
+.onboarding-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:28px 32px;margin-bottom:20px}
+.onboarding h2{color:var(--accent);margin-bottom:4px;font-size:1.2em}
+.onboarding .ob-subtitle{color:var(--text-secondary);font-size:0.85em;margin-bottom:20px}
+.onboarding .ob-info{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:20px}
+.onboarding .ob-info-item{font-size:0.82em;color:var(--text-secondary)}
+.onboarding .ob-info-item strong{color:var(--text);font-weight:600}
 .onboarding p{color:var(--text-secondary);line-height:1.5;margin-bottom:12px;font-size:0.9em}
 .onboarding .cmd-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:monospace;font-size:0.83em;overflow-x:auto;white-space:pre-wrap;word-break:break-all;position:relative;margin-bottom:16px;color:var(--text)}
 .onboarding .cmd-block .copy-btn{position:absolute;top:6px;right:6px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;font-size:0.85em}
 .onboarding .cmd-block .copy-btn:hover{color:var(--text)}
 .onboarding .step{margin-bottom:20px}
 .onboarding .step h3{color:var(--text);font-size:0.95em;margin-bottom:6px}
+.onboarding .step-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent-bg);color:#fff;font-size:0.75em;font-weight:700;margin-right:6px;flex-shrink:0}
+.onboarding hr{border:none;border-top:1px solid var(--border);margin:20px 0}
 
 /* Create channel modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:500}
@@ -131,6 +153,8 @@ a:hover{text-decoration:underline}
   .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:199}
   .sidebar-backdrop.open{display:block}
   .compose-channel{width:100px}
+  .onboarding{padding:16px}
+  .onboarding-card{padding:20px 16px}
 }
 </style>
 </head>
@@ -186,10 +210,13 @@ a:hover{text-decoration:underline}
       </div>
       <div class="compose" id="compose-bar">
         <div class="compose-row">
-          <input class="compose-channel" id="compose-ch" placeholder="#channel" list="ch-datalist">
+          <input class="compose-channel" id="compose-ch" placeholder="general" list="ch-datalist">
           <datalist id="ch-datalist"></datalist>
           <textarea class="compose-input" id="compose-msg" placeholder="Type a message..." rows="1"></textarea>
-          <button class="compose-send" id="compose-send">Send</button>
+          <div class="compose-send-wrap">
+            <button class="compose-send" id="compose-send">Send</button>
+            <span class="compose-hint">Enter to send</span>
+          </div>
         </div>
       </div>
     </div>
@@ -230,6 +257,7 @@ let audioCtx = null;
 let oldestMsgId = Infinity;
 let isLoadingMore = false;
 let hasOnboarded = false;
+let previousMessageCount = 0;
 
 // ---- Util ----
 function esc(s) {
@@ -364,45 +392,53 @@ function updateTitle() {
 function renderPeers() {
   var el = document.getElementById('peers-list');
   el.innerHTML = '';
-  if (!allPeers.length) {
-    var empty = document.createElement('div');
-    empty.className = 'empty';
-    empty.style.padding = '12px';
-    empty.textContent = 'No peers yet';
-    el.appendChild(empty);
+  var otherPeers = allPeers.filter(function(p) { return p.peer_name !== myName; });
+  if (!allPeers.length || (!otherPeers.length && allPeers.length <= 1)) {
+    var hint = document.createElement('div');
+    hint.className = 'sidebar-empty-hint';
+    hint.textContent = 'Invite others to join the relay. Create tokens with: python relay.py token create --name theirname';
+    el.appendChild(hint);
+    // Still show current user if present
+    allPeers.forEach(function(p) {
+      el.appendChild(buildPeerItem(p));
+    });
     return;
   }
   allPeers.forEach(function(p) {
-    var div = document.createElement('div');
-    div.className = 'peer-item tooltip';
-    if (p.peer_name === myName) div.className += ' is-you';
-    div.setAttribute('data-peer', p.peer_name);
-
-    var dot = document.createElement('span');
-    dot.className = 'dot ' + (p.status === 'online' ? 'online' : 'offline');
-
-    var name = document.createElement('span');
-    name.className = 'peer-name-text';
-    name.textContent = p.peer_name;
-
-    var status = document.createElement('span');
-    status.className = 'peer-status-text';
-    status.textContent = p.status_message || (p.last_seen ? timeAgo(p.last_seen) : '');
-
-    // Tooltip
-    var tt = document.createElement('span');
-    tt.className = 'tt-text';
-    var ttLines = p.peer_name + ' (' + p.status + ')';
-    if (p.status_message) ttLines += '\nStatus: ' + p.status_message;
-    if (p.last_seen) ttLines += '\nLast seen: ' + p.last_seen;
-    tt.textContent = ttLines;
-
-    div.appendChild(dot);
-    div.appendChild(name);
-    div.appendChild(status);
-    div.appendChild(tt);
-    el.appendChild(div);
+    el.appendChild(buildPeerItem(p));
   });
+}
+
+function buildPeerItem(p) {
+  var div = document.createElement('div');
+  div.className = 'peer-item tooltip';
+  if (p.peer_name === myName) div.className += ' is-you';
+  div.setAttribute('data-peer', p.peer_name);
+
+  var dot = document.createElement('span');
+  dot.className = 'dot ' + (p.status === 'online' ? 'online' : 'offline');
+
+  var name = document.createElement('span');
+  name.className = 'peer-name-text';
+  name.textContent = p.peer_name;
+
+  var status = document.createElement('span');
+  status.className = 'peer-status-text';
+  status.textContent = p.status_message || (p.last_seen ? timeAgo(p.last_seen) : '');
+
+  // Tooltip
+  var tt = document.createElement('span');
+  tt.className = 'tt-text';
+  var ttLines = p.peer_name + ' (' + p.status + ')';
+  if (p.status_message) ttLines += '\nStatus: ' + p.status_message;
+  if (p.last_seen) ttLines += '\nLast seen: ' + p.last_seen;
+  tt.textContent = ttLines;
+
+  div.appendChild(dot);
+  div.appendChild(name);
+  div.appendChild(status);
+  div.appendChild(tt);
+  return div;
 }
 
 // ---- Render channels ----
@@ -427,6 +463,14 @@ function renderChannels() {
     allItem.appendChild(badge);
   }
   el.appendChild(allItem);
+
+  if (!allChannels.length) {
+    var hint = document.createElement('div');
+    hint.className = 'sidebar-empty-hint';
+    hint.textContent = 'Send a message to create your first channel';
+    el.appendChild(hint);
+    return;
+  }
 
   // Sort: #general first, then by last_activity desc
   var sorted = allChannels.slice().sort(function(a, b) {
@@ -489,15 +533,23 @@ function renderMessages(scrollToBottom) {
     ? allMessages.filter(function(m) { return m.channel === currentChannel; })
     : allMessages;
 
+  // Detect transition from 0 to 1+ messages
+  var wasEmpty = previousMessageCount === 0;
+  var isFirstMessage = wasEmpty && filtered.length > 0;
+  previousMessageCount = filtered.length;
+
   el.innerHTML = '';
 
   if (!filtered.length) {
-    var empty = document.createElement('div');
-    empty.className = 'empty';
-    empty.textContent = 'No messages yet';
-    el.appendChild(empty);
-    // Check for onboarding
-    if (!hasOnboarded && allMessages.length === 0) showOnboarding(el);
+    // Show onboarding card if no messages at all and no channels
+    if (!hasOnboarded && allMessages.length === 0 && allChannels.length === 0) {
+      showOnboarding(el);
+    } else {
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'No messages yet';
+      el.appendChild(empty);
+    }
     return;
   }
 
@@ -522,6 +574,9 @@ function renderMessages(scrollToBottom) {
 
     var msgDiv = document.createElement('div');
     msgDiv.className = 'msg' + (grouped ? ' msg-grouped' : '');
+    if (isFirstMessage && i === 0) {
+      msgDiv.className += ' msg-first-animate';
+    }
     msgDiv.setAttribute('data-msg-id', m.id);
 
     if (!grouped) {
@@ -566,29 +621,58 @@ function renderMessages(scrollToBottom) {
 function showOnboarding(container) {
   hasOnboarded = true;
   var relayUrl = window.location.origin + '/mcp';
+  var storedToken = sessionStorage.getItem('relay_token') || 'YOUR_TOKEN';
   container.innerHTML = '';
   var ob = document.createElement('div');
   ob.className = 'onboarding';
 
+  var card = document.createElement('div');
+  card.className = 'onboarding-card';
+
   var h2 = document.createElement('h2');
-  h2.textContent = 'Welcome to Agentic Chat';
-  ob.appendChild(h2);
+  h2.textContent = 'Welcome, ' + esc(myName) + '!';
+  card.appendChild(h2);
 
-  var p1 = document.createElement('p');
-  p1.textContent = 'You are signed in as ' + myName + ' in the ' + myNamespace + ' namespace.';
-  ob.appendChild(p1);
+  var subtitle = document.createElement('div');
+  subtitle.className = 'ob-subtitle';
+  subtitle.textContent = 'You are connected and ready to go.';
+  card.appendChild(subtitle);
 
+  // Info items
+  var info = document.createElement('div');
+  info.className = 'ob-info';
+
+  var infoNs = document.createElement('div');
+  infoNs.className = 'ob-info-item';
+  infoNs.innerHTML = '<strong>Namespace:</strong> ' + esc(myNamespace);
+  info.appendChild(infoNs);
+
+  var infoRelay = document.createElement('div');
+  infoRelay.className = 'ob-info-item';
+  infoRelay.innerHTML = '<strong>Relay:</strong> ' + esc(window.location.origin);
+  info.appendChild(infoRelay);
+
+  card.appendChild(info);
+
+  var hr1 = document.createElement('hr');
+  card.appendChild(hr1);
+
+  // Step 1: Connect Claude Code
   var step1 = document.createElement('div');
   step1.className = 'step';
   var s1h = document.createElement('h3');
-  s1h.textContent = '1. Connect Claude Code';
+  var s1num = document.createElement('span');
+  s1num.className = 'step-num';
+  s1num.textContent = '1';
+  s1h.appendChild(s1num);
+  s1h.appendChild(document.createTextNode('Connect Claude Code using the command below'));
   step1.appendChild(s1h);
   var s1p = document.createElement('p');
-  s1p.textContent = 'Run this command in your terminal to connect a Claude Code session:';
+  s1p.textContent = 'Run this in your terminal to connect a Claude Code session to the relay:';
   step1.appendChild(s1p);
   var cmdBlock = document.createElement('div');
   cmdBlock.className = 'cmd-block';
-  var cmdText = 'claude mcp add --transport http --header "Authorization: Bearer YOUR_TOKEN" -- relay ' + relayUrl;
+  var cmdText = 'claude mcp add --transport http --header "Authorization: Bearer ' + storedToken + '" -- relay ' + relayUrl;
   cmdBlock.textContent = cmdText;
   var copyBtn = document.createElement('button');
   copyBtn.className = 'copy-btn';
@@ -598,40 +682,51 @@ function showOnboarding(container) {
   });
   cmdBlock.appendChild(copyBtn);
   step1.appendChild(cmdBlock);
-  ob.appendChild(step1);
+  card.appendChild(step1);
 
+  // Step 2: Invite a friend
   var step2 = document.createElement('div');
   step2.className = 'step';
   var s2h = document.createElement('h3');
-  s2h.textContent = '2. Invite others';
+  var s2num = document.createElement('span');
+  s2num.className = 'step-num';
+  s2num.textContent = '2';
+  s2h.appendChild(s2num);
+  s2h.appendChild(document.createTextNode('Invite a friend'));
   step2.appendChild(s2h);
   var s2p = document.createElement('p');
-  s2p.textContent = 'Create tokens for other peers using the CLI on the server:';
+  s2p.textContent = 'Have them run this on the server to create their own token:';
   step2.appendChild(s2p);
   var cmd2 = document.createElement('div');
   cmd2.className = 'cmd-block';
-  cmd2.textContent = 'python relay.py token create --name PEER_NAME --url ' + window.location.origin;
+  var cmd2Text = 'python relay.py token create --name theirname --url ' + window.location.origin;
+  cmd2.textContent = cmd2Text;
   var copy2 = document.createElement('button');
   copy2.className = 'copy-btn';
   copy2.textContent = 'Copy';
   copy2.addEventListener('click', function() {
-    var t = cmd2.textContent.replace('Copy', '').trim();
-    navigator.clipboard.writeText(t).then(function() { copy2.textContent = 'Copied!'; setTimeout(function() { copy2.textContent = 'Copy'; }, 1500); });
+    navigator.clipboard.writeText(cmd2Text).then(function() { copy2.textContent = 'Copied!'; setTimeout(function() { copy2.textContent = 'Copy'; }, 1500); });
   });
   cmd2.appendChild(copy2);
   step2.appendChild(cmd2);
-  ob.appendChild(step2);
+  card.appendChild(step2);
 
+  // Step 3: Send a message
   var step3 = document.createElement('div');
   step3.className = 'step';
   var s3h = document.createElement('h3');
-  s3h.textContent = '3. Start chatting';
+  var s3num = document.createElement('span');
+  s3num.className = 'step-num';
+  s3num.textContent = '3';
+  s3h.appendChild(s3num);
+  s3h.appendChild(document.createTextNode('Or just send a message below to start a conversation'));
   step3.appendChild(s3h);
   var s3p = document.createElement('p');
-  s3p.textContent = 'Use the compose bar below to send your first message to #general, or tell Claude Code to "check the relay".';
+  s3p.textContent = 'Use the compose bar at the bottom. Your first message will create the #general channel automatically.';
   step3.appendChild(s3p);
-  ob.appendChild(step3);
+  card.appendChild(step3);
 
+  ob.appendChild(card);
   container.appendChild(ob);
 }
 
@@ -763,6 +858,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
   allMessages = [];
   oldestMsgId = Infinity;
   hasOnboarded = false;
+  previousMessageCount = 0;
 
   var ok = await refresh(true);
   if (ok) {
@@ -780,6 +876,7 @@ document.getElementById('sign-out-btn').addEventListener('click', function() {
   allMessages = [];
   allPeers = [];
   allChannels = [];
+  previousMessageCount = 0;
   showLogin();
 });
 

@@ -390,8 +390,9 @@ async def test_dashboard_api_empty_state(test_db, http_client):
     assert data["namespace"] == "default"
     assert data["channels"] == []
     assert data["messages"] == []
-    # peers contains alice (the caller) since auth middleware upserts her row
-    assert any(p["peer_name"] == "alice" for p in data["peers"])
+    # Dashboard bypasses the MCP middleware, so no automatic peer upsert.
+    # The peers list may be empty if alice hasn't heartbeated yet.
+    assert isinstance(data["peers"], list)
 
 
 @pytest.mark.asyncio

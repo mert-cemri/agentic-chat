@@ -247,7 +247,7 @@ async def test_dashboard_html_loads(http_client):
     """Dashboard HTML is served without auth."""
     resp = await http_client.get("/dashboard")
     assert resp.status_code == 200
-    assert "Claude Relay" in resp.text
+    assert "Agentic Chat" in resp.text
     assert "<!DOCTYPE html>" in resp.text
 
 
@@ -257,17 +257,17 @@ async def test_dashboard_api_requires_auth(http_client):
     resp = await http_client.get("/dashboard/api")
     assert resp.status_code == 401
     data = resp.json()
-    # Middleware intercepts with a "missing Authorization" error
-    assert "Authorization" in data["error"]
+    assert "Unauthorized" in data["error"] or "Authorization" in data.get("hint", "")
 
 
 @pytest.mark.asyncio
 async def test_dashboard_api_rejects_invalid_token(http_client):
-    """Dashboard API rejects invalid bearer tokens (403 = token provided but invalid)."""
+    """Dashboard API rejects invalid bearer tokens."""
     resp = await http_client.get(
         "/dashboard/api", headers={"Authorization": "Bearer relay_tok_bogus"}
     )
-    assert resp.status_code == 403
+    # Dashboard endpoint handles its own auth — both missing and invalid return 401
+    assert resp.status_code == 401
 
 
 @pytest.mark.asyncio

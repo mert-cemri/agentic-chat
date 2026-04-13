@@ -320,11 +320,11 @@ class TokenAuthMiddleware:
             return await self.app(scope, receive, send)
 
         path = scope.get("path", "")
-        # /health, /join/, and the dashboard HTML shell are public.
-        # /dashboard/api requires auth — it's handled by the endpoint itself.
+        # /health, /join/, and dashboard routes are public (dashboard API
+        # endpoints handle their own auth via _authenticate_dashboard_request).
         if (
             path == "/health"
-            or path == "/dashboard"
+            or path.startswith("/dashboard")
             or path.startswith("/join/")
         ):
             return await self.app(scope, receive, send)
@@ -1200,245 +1200,937 @@ DASHBOARD_HTML = """\
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claude Relay Dashboard</title>
+<title>Agentic Chat</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect rx='18' width='100' height='80' y='10' fill='%2358a6ff'/><polygon points='30,90 50,90 35,108' fill='%2358a6ff'/><circle cx='32' cy='45' r='7' fill='%230d1117'/><circle cx='52' cy='45' r='7' fill='%230d1117'/><circle cx='72' cy='45' r='7' fill='%230d1117'/></svg>">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, system-ui, 'Segoe UI', sans-serif;
-         background: #0d1117; color: #e6edf3; }
-  .container { max-width: 960px; margin: 0 auto; padding: 20px; }
-  h1 { font-size: 1.3em; color: #58a6ff; margin-bottom: 4px; }
-  .subtitle { color: #8b949e; font-size: 0.85em; margin-bottom: 20px; }
-  .grid { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
-  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d1117;--bg-secondary:#161b22;--bg-tertiary:#21262d;--border:#30363d;--text:#e6edf3;--text-secondary:#8b949e;--text-muted:#484f58;--accent:#58a6ff;--accent-bg:#388bfd;--green:#3fb950;--red:#f85149;--yellow:#e3b341;--code-bg:#1a1f29}
+body{font-family:-apple-system,system-ui,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
 
-  /* Sidebar */
-  .sidebar { display: flex; flex-direction: column; gap: 12px; }
-  .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px; }
-  .card h2 { font-size: 0.85em; color: #8b949e; text-transform: uppercase;
-             letter-spacing: 0.5px; margin-bottom: 10px; }
-  .peer { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.9em; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .dot.online { background: #3fb950; }
-  .dot.offline { background: #484f58; }
-  .peer-name { font-weight: 500; }
-  .peer-status { color: #8b949e; font-size: 0.8em; }
-  .channel { padding: 4px 0; font-size: 0.9em; cursor: pointer; }
-  .channel:hover { color: #58a6ff; }
-  .channel .badge { background: #388bfd; color: #fff; border-radius: 10px;
-                    padding: 1px 7px; font-size: 0.75em; margin-left: 6px; }
-  .channel.active { color: #58a6ff; font-weight: 600; }
+/* Layout */
+.app{display:flex;height:100vh;flex-direction:column}
+.header{background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:100}
+.header-logo{color:var(--accent);font-weight:700;font-size:1.1em;white-space:nowrap}
+.header-meta{color:var(--text-secondary);font-size:0.8em;display:flex;align-items:center;gap:8px;margin-left:auto;white-space:nowrap}
+.header-meta .conn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.header-meta .conn-dot.ok{background:var(--green)}
+.header-meta .conn-dot.fail{background:var(--red)}
+.header-user{color:var(--accent);font-weight:600;font-size:0.85em}
+.sign-out-btn{color:var(--text-secondary);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.8em}
+.sign-out-btn:hover{color:var(--text);border-color:var(--text-muted)}
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:1.4em;cursor:pointer;padding:4px 8px}
 
-  /* Messages */
-  .messages-panel { display: flex; flex-direction: column; }
-  .messages-header { background: #161b22; border: 1px solid #30363d;
-                     border-radius: 8px 8px 0 0; padding: 12px 16px;
-                     font-weight: 600; font-size: 0.95em; }
-  .messages-list { background: #0d1117; border: 1px solid #30363d; border-top: none;
-                   border-radius: 0 0 8px 8px; padding: 8px 0;
-                   min-height: 400px; max-height: 70vh; overflow-y: auto; }
-  .msg { padding: 6px 16px; display: flex; gap: 10px; }
-  .msg:hover { background: #161b22; }
-  .msg-sender { color: #58a6ff; font-weight: 600; font-size: 0.9em; min-width: 80px; flex-shrink: 0; }
-  .msg-content { font-size: 0.9em; line-height: 1.4; word-break: break-word; flex: 1; }
-  .msg-time { color: #484f58; font-size: 0.75em; flex-shrink: 0; }
-  .msg-channel { color: #8b949e; font-size: 0.75em; background: #21262d;
-                 padding: 1px 6px; border-radius: 4px; flex-shrink: 0; }
-  .empty { color: #484f58; text-align: center; padding: 40px; font-size: 0.9em; }
-  .auto-refresh { color: #484f58; font-size: 0.75em; text-align: right; padding: 8px 16px; }
+.main{display:flex;flex:1;overflow:hidden}
+
+/* Sidebar */
+.sidebar{width:260px;flex-shrink:0;background:var(--bg-secondary);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.sidebar-section{padding:12px}
+.sidebar-section+.sidebar-section{border-top:1px solid var(--border)}
+.sidebar-title{font-size:0.75em;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.sidebar-title button{background:none;border:1px solid var(--border);color:var(--text-secondary);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:0.9em;display:flex;align-items:center;justify-content:center;line-height:1}
+.sidebar-title button:hover{color:var(--text);border-color:var(--text-muted)}
+
+.peer-item{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:0.87em;cursor:pointer}
+.peer-item:hover{background:var(--bg-tertiary)}
+.peer-item.is-you{opacity:0.7}
+.peer-item.is-you .peer-name-text::after{content:" (you)";color:var(--text-muted);font-size:0.8em;font-weight:normal}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot.online{background:var(--green)}
+.dot.offline{background:var(--text-muted)}
+.peer-name-text{font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.peer-status-text{color:var(--text-secondary);font-size:0.78em;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.channel-item{display:flex;align-items:center;padding:5px 8px;border-radius:6px;font-size:0.87em;cursor:pointer;gap:6px}
+.channel-item:hover{background:var(--bg-tertiary)}
+.channel-item.active{background:var(--bg-tertiary);color:var(--accent);font-weight:600}
+.channel-item .ch-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.channel-item .ch-badge{background:var(--accent-bg);color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72em;font-weight:600;flex-shrink:0}
+.channel-item.broadcast{font-weight:600}
+.channel-item.broadcast .ch-icon{margin-right:2px}
+.channel-all{color:var(--text-secondary);margin-top:6px;border-top:1px solid var(--border);padding-top:8px}
+
+/* Messages panel */
+.messages-panel{flex:1;display:flex;flex-direction:column;min-width:0}
+.messages-header{background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:10px 16px;font-weight:600;font-size:0.95em;flex-shrink:0;display:flex;align-items:center;gap:8px}
+.messages-list{flex:1;overflow-y:auto;padding:4px 0}
+.load-more-btn{display:block;margin:8px auto;padding:4px 16px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.8em}
+.load-more-btn:hover{color:var(--text);border-color:var(--text-muted)}
+
+.msg{padding:2px 16px 2px 16px}
+.msg:hover{background:var(--bg-secondary)}
+.msg.msg-grouped{padding-top:0}
+.msg-header{display:flex;align-items:baseline;gap:8px;margin-top:6px}
+.msg-sender{color:var(--accent);font-weight:600;font-size:0.87em}
+.msg-sender.is-you{color:var(--yellow)}
+.msg-time{color:var(--text-muted);font-size:0.72em;cursor:default}
+.msg-ch-tag{color:var(--text-secondary);font-size:0.72em;background:var(--bg-tertiary);padding:1px 6px;border-radius:4px}
+.msg-body{font-size:0.87em;line-height:1.45;word-break:break-word;padding-left:0;margin-top:1px;color:var(--text)}
+.msg-body code{background:var(--code-bg);padding:1px 5px;border-radius:3px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:0.92em}
+.msg-body pre{background:var(--code-bg);padding:10px 12px;border-radius:6px;overflow-x:auto;margin:4px 0;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:0.88em;line-height:1.4;white-space:pre-wrap}
+.msg-body pre code{background:none;padding:0;font-size:1em}
+.empty{color:var(--text-muted);text-align:center;padding:40px;font-size:0.9em}
+
+/* Compose */
+.compose{background:var(--bg-secondary);border-top:1px solid var(--border);padding:10px 16px;flex-shrink:0}
+.compose-row{display:flex;gap:8px;align-items:flex-end}
+.compose-channel{background:var(--bg);color:var(--text-secondary);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.85em;font-family:inherit;width:140px;flex-shrink:0}
+.compose-channel:focus{outline:none;border-color:var(--accent)}
+.compose-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 12px;font-size:0.87em;font-family:inherit;resize:none;min-height:36px;max-height:120px}
+.compose-input:focus{outline:none;border-color:var(--accent)}
+.compose-send{background:var(--green);color:#fff;border:none;border-radius:6px;padding:7px 16px;font-weight:600;cursor:pointer;font-size:0.87em;white-space:nowrap;align-self:flex-end}
+.compose-send:hover{opacity:0.9}
+.compose-send:disabled{opacity:0.5;cursor:not-allowed}
+
+/* Login */
+.login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000}
+.login-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:32px;max-width:420px;width:90%}
+.login-card h1{color:var(--accent);font-size:1.3em;margin-bottom:4px}
+.login-card .sub{color:var(--text-secondary);font-size:0.85em;margin-bottom:20px}
+.login-card input{width:100%;padding:10px 14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:0.9em;margin-bottom:12px}
+.login-card input:focus{outline:none;border-color:var(--accent)}
+.login-card button{width:100%;padding:10px;background:#238636;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:0.95em}
+.login-card button:hover{background:#2ea043}
+.login-error{color:var(--red);font-size:0.83em;margin-top:8px}
+
+/* Onboarding */
+.onboarding{padding:32px;max-width:600px;margin:0 auto}
+.onboarding h2{color:var(--accent);margin-bottom:12px}
+.onboarding p{color:var(--text-secondary);line-height:1.5;margin-bottom:12px;font-size:0.9em}
+.onboarding .cmd-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:monospace;font-size:0.83em;overflow-x:auto;white-space:pre-wrap;word-break:break-all;position:relative;margin-bottom:16px;color:var(--text)}
+.onboarding .cmd-block .copy-btn{position:absolute;top:6px;right:6px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;font-size:0.85em}
+.onboarding .cmd-block .copy-btn:hover{color:var(--text)}
+.onboarding .step{margin-bottom:20px}
+.onboarding .step h3{color:var(--text);font-size:0.95em;margin-bottom:6px}
+
+/* Create channel modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:500}
+.modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:24px;width:340px;max-width:90%}
+.modal h3{color:var(--text);margin-bottom:12px;font-size:1em}
+.modal input{width:100%;padding:8px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9em;margin-bottom:12px}
+.modal input:focus{outline:none;border-color:var(--accent)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.modal-actions button{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:0.87em;font-weight:500}
+.modal-actions .cancel{background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
+.modal-actions .confirm{background:var(--green);color:#fff}
+
+/* Tooltip */
+.tooltip{position:relative}
+.tooltip .tt-text{visibility:hidden;background:var(--bg-tertiary);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:0.78em;position:absolute;z-index:200;white-space:pre-wrap;max-width:280px;bottom:calc(100% + 6px);left:0;pointer-events:none;line-height:1.4}
+.tooltip:hover .tt-text{visibility:visible}
+
+/* Mobile */
+@media(max-width:768px){
+  .hamburger{display:block}
+  .sidebar{position:fixed;left:-280px;top:0;bottom:0;z-index:200;width:280px;transition:left 0.2s}
+  .sidebar.open{left:0}
+  .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:199}
+  .sidebar-backdrop.open{display:block}
+  .compose-channel{width:100px}
+}
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>Claude Relay</h1>
-  <p class="subtitle">Live message dashboard &mdash; auto-refreshes every 3s</p>
 
-  <div id="login-box" class="card" style="max-width: 500px; margin-bottom: 20px; display: none;">
-    <h2 style="color: #e6edf3; margin-bottom: 12px;">Sign in</h2>
-    <p class="subtitle" style="margin-bottom: 12px;">
-      Paste your relay token to view messages in your namespace.
-    </p>
-    <form id="login-form" style="display: flex; gap: 8px;">
-      <input type="password" id="token-input" placeholder="relay_tok_..."
-             style="flex: 1; padding: 8px 12px; background: #0d1117; color: #e6edf3;
-                    border: 1px solid #30363d; border-radius: 6px; font-family: monospace;">
-      <button type="submit"
-              style="padding: 8px 16px; background: #238636; color: #fff;
-                     border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
-        Sign in
-      </button>
+<!-- Login overlay -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <h1>Agentic Chat</h1>
+    <p class="sub">Paste your relay token to connect.</p>
+    <form id="login-form">
+      <input type="password" id="token-input" placeholder="relay_tok_..." autocomplete="off">
+      <button type="submit">Sign in</button>
     </form>
-    <div id="login-error" style="color: #f85149; margin-top: 8px; font-size: 0.85em;"></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- App shell -->
+<div class="app" id="app" style="display:none">
+  <div class="header">
+    <button class="hamburger" id="hamburger-btn" aria-label="Toggle sidebar">&#9776;</button>
+    <span class="header-logo">Agentic Chat</span>
+    <div class="header-meta">
+      <span class="conn-dot ok" id="conn-dot"></span>
+      <span id="conn-label">Connected</span>
+      <span style="color:var(--border)">|</span>
+      <span class="header-user" id="header-user"></span>
+      <button class="sign-out-btn" id="sign-out-btn">Sign out</button>
+    </div>
   </div>
 
-  <div id="dashboard-content" style="display: none;">
-    <div style="margin-bottom: 12px; font-size: 0.85em; color: #8b949e;">
-      Namespace: <span id="ns-label" style="color: #58a6ff;"></span>
-      &middot;
-      <a href="#" onclick="signOut(); return false;" style="color: #8b949e;">Sign out</a>
-    </div>
-    <div class="grid">
-      <div class="sidebar">
-        <div class="card">
-          <h2>Peers</h2>
-          <div id="peers"><div class="empty">Loading...</div></div>
-        </div>
-        <div class="card">
-          <h2>Channels</h2>
-          <div id="channels"><div class="empty">Loading...</div></div>
-        </div>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <div class="main">
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title"><span>Peers</span></div>
+        <div id="peers-list"></div>
       </div>
-      <div class="messages-panel">
-        <div class="messages-header" id="msg-header">All Messages</div>
-        <div class="messages-list" id="messages">
-          <div class="empty">Loading...</div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">
+          <span>Channels</span>
+          <button id="create-channel-btn" title="Create channel">+</button>
         </div>
-        <div class="auto-refresh">Auto-refreshes every 3 seconds</div>
+        <div id="channels-list"></div>
+      </div>
+    </div>
+
+    <div class="messages-panel">
+      <div class="messages-header" id="msg-header">All Messages</div>
+      <div class="messages-list" id="messages-list">
+        <div class="empty">Loading...</div>
+      </div>
+      <div class="compose" id="compose-bar">
+        <div class="compose-row">
+          <input class="compose-channel" id="compose-ch" placeholder="#channel" list="ch-datalist">
+          <datalist id="ch-datalist"></datalist>
+          <textarea class="compose-input" id="compose-msg" placeholder="Type a message..." rows="1"></textarea>
+          <button class="compose-send" id="compose-send">Send</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Create channel modal (hidden) -->
+<div class="modal-overlay" id="modal-create-ch" style="display:none">
+  <div class="modal">
+    <h3>Create Channel</h3>
+    <input id="new-ch-name" placeholder="channel-name" maxlength="64" autocomplete="off">
+    <div class="modal-actions">
+      <button class="cancel" id="modal-ch-cancel">Cancel</button>
+      <button class="confirm" id="modal-ch-confirm">Create</button>
+    </div>
+  </div>
+</div>
+
 <script>
-let currentChannel = null;
+(function(){
+"use strict";
+
+// ---- State ----
+let token = sessionStorage.getItem('relay_token');
+let currentChannel = null; // null = all
+let myName = '';
+let myNamespace = '';
+let knownMsgIds = new Set();
+let lastSeenPerChannel = {}; // channel -> maxId (client-side tracking)
+let allMessages = [];
+let allChannels = [];
+let allPeers = [];
+let connected = true;
+let lastSuccessTime = Date.now();
 let refreshTimer = null;
+let notifPermission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
+let audioCtx = null;
+let oldestMsgId = Infinity;
+let isLoadingMore = false;
+let hasOnboarded = false;
 
-function getToken() { return sessionStorage.getItem('relay_token'); }
-function setToken(t) { sessionStorage.setItem('relay_token', t); }
-function clearToken() { sessionStorage.removeItem('relay_token'); }
-
-function showLogin(errMsg) {
-  document.getElementById('login-box').style.display = 'block';
-  document.getElementById('dashboard-content').style.display = 'none';
-  document.getElementById('login-error').textContent = errMsg || '';
-  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
-}
-
-function showDashboard() {
-  document.getElementById('login-box').style.display = 'none';
-  document.getElementById('dashboard-content').style.display = 'block';
-}
-
-function signOut() {
-  clearToken();
-  showLogin();
-}
-
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const t = document.getElementById('token-input').value.trim();
-  if (!t) return;
-  setToken(t);
-  const ok = await refresh();
-  if (ok) {
-    showDashboard();
-    if (!refreshTimer) refreshTimer = setInterval(refresh, 3000);
-  }
-});
-
-async function fetchData() {
-  const token = getToken();
-  if (!token) return { _unauth: true };
-  try {
-    const resp = await fetch('/dashboard/api', {
-      headers: { 'Authorization': 'Bearer ' + token },
-    });
-    if (resp.status === 401 || resp.status === 403) {
-      return { _unauth: true };
-    }
-    return await resp.json();
-  } catch { return null; }
+// ---- Util ----
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }
 
 function timeAgo(iso) {
   if (!iso) return '';
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  var s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 0) s = 0;
   if (s < 60) return s + 's ago';
   if (s < 3600) return Math.floor(s/60) + 'm ago';
   if (s < 86400) return Math.floor(s/3600) + 'h ago';
   return Math.floor(s/86400) + 'd ago';
 }
 
-function renderPeers(peers) {
-  const el = document.getElementById('peers');
-  if (!peers.length) { el.innerHTML = '<div class="empty">No peers yet</div>'; return; }
-  el.innerHTML = peers.map(p => `
-    <div class="peer">
-      <span class="dot ${p.status}"></span>
-      <span class="peer-name">${p.peer_name}</span>
-      <span class="peer-status">${p.status_message || timeAgo(p.last_seen) || ''}</span>
-    </div>
-  `).join('');
+// ---- Sound (Web Audio API) ----
+function playPing() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.3);
+  } catch(e) {}
 }
 
-function renderChannels(channels) {
-  const el = document.getElementById('channels');
-  if (!channels.length) { el.innerHTML = '<div class="empty">No channels yet</div>'; return; }
-  el.innerHTML = channels.map(c => `
-    <div class="channel ${currentChannel === c.name ? 'active' : ''}"
-         onclick="filterChannel('${c.name}')">
-      #${c.name}
-      ${c.unread > 0 ? '<span class="badge">' + c.unread + '</span>' : ''}
-    </div>
-  `).join('') + `
-    <div class="channel ${currentChannel === null ? 'active' : ''}"
-         onclick="filterChannel(null)"
-         style="margin-top:8px; color:#8b949e;">Show all</div>`;
+// ---- Notifications ----
+function requestNotifPermission() {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    Notification.requestPermission().then(function(p) { notifPermission = p; });
+  }
 }
 
-function renderMessages(messages) {
-  const el = document.getElementById('messages');
-  const header = document.getElementById('msg-header');
-  header.textContent = currentChannel ? '#' + currentChannel : 'All Messages';
+function showNotif(title, body) {
+  if (notifPermission === 'granted' && document.hidden) {
+    try { new Notification(title, { body: body, icon: 'data:image/svg+xml,' + encodeURIComponent("<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'><rect rx=\\'18\\' width=\\'100\\' height=\\'80\\' y=\\'10\\' fill=\\'%2358a6ff\\'/></svg>") }); } catch(e) {}
+  }
+}
 
-  let filtered = currentChannel
-    ? messages.filter(m => m.channel === currentChannel)
-    : messages;
+// ---- Format message content (XSS-safe) ----
+function formatContent(raw) {
+  // Escape first
+  var text = esc(raw);
+  // Multi-line code blocks: ```...```
+  text = text.replace(/```([\\s\\S]*?)```/g, function(_, code) {
+    return '<pre><code>' + code + '</code></pre>';
+  });
+  // Inline code: `...`
+  text = text.replace(/`([^`]+)`/g, function(_, code) {
+    return '<code>' + code + '</code>';
+  });
+  return text;
+}
 
-  if (!filtered.length) {
-    el.innerHTML = '<div class="empty">No messages yet</div>';
+// ---- API ----
+function apiHeaders() {
+  return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+}
+
+async function fetchDashboardData() {
+  try {
+    var resp = await fetch('/dashboard/api', { headers: apiHeaders() });
+    if (resp.status === 401 || resp.status === 403) return { _unauth: true };
+    var data = await resp.json();
+    connected = true;
+    lastSuccessTime = Date.now();
+    return data;
+  } catch(e) {
+    connected = false;
+    return null;
+  }
+}
+
+async function sendMessage(channel, content) {
+  try {
+    var resp = await fetch('/dashboard/api/send', {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({ channel: channel, content: content })
+    });
+    return await resp.json();
+  } catch(e) {
+    return { ok: false, error: 'Network error' };
+  }
+}
+
+async function fetchOlderMessages(beforeId) {
+  try {
+    var resp = await fetch('/dashboard/api?before_id=' + beforeId + '&limit=50', { headers: apiHeaders() });
+    if (resp.status === 401 || resp.status === 403) return null;
+    return await resp.json();
+  } catch(e) { return null; }
+}
+
+// ---- Connection indicator ----
+function updateConnStatus() {
+  var dot = document.getElementById('conn-dot');
+  var label = document.getElementById('conn-label');
+  if (connected) {
+    dot.className = 'conn-dot ok';
+    label.textContent = 'Connected';
+  } else {
+    dot.className = 'conn-dot fail';
+    var ago = timeAgo(new Date(lastSuccessTime).toISOString());
+    label.textContent = 'Disconnected (last: ' + ago + ')';
+  }
+}
+
+// ---- Title badge ----
+function updateTitle() {
+  var total = 0;
+  for (var ch in lastSeenPerChannel) {
+    // count is stored on channel data
+  }
+  // Compute from channel unread data
+  total = allChannels.reduce(function(sum, c) { return sum + (c._clientUnread || 0); }, 0);
+  document.title = total > 0 ? '(' + total + ') Agentic Chat' : 'Agentic Chat';
+}
+
+// ---- Render peers ----
+function renderPeers() {
+  var el = document.getElementById('peers-list');
+  el.innerHTML = '';
+  if (!allPeers.length) {
+    var empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.style.padding = '12px';
+    empty.textContent = 'No peers yet';
+    el.appendChild(empty);
     return;
   }
-  el.innerHTML = filtered.map(m => `
-    <div class="msg">
-      <span class="msg-sender">${m.sender}</span>
-      ${!currentChannel ? '<span class="msg-channel">#' + m.channel + '</span>' : ''}
-      <span class="msg-content">${escapeHtml(m.content)}</span>
-      <span class="msg-time">${timeAgo(m.timestamp)}</span>
-    </div>
-  `).join('');
-  el.scrollTop = el.scrollHeight;
+  allPeers.forEach(function(p) {
+    var div = document.createElement('div');
+    div.className = 'peer-item tooltip';
+    if (p.peer_name === myName) div.className += ' is-you';
+    div.setAttribute('data-peer', p.peer_name);
+
+    var dot = document.createElement('span');
+    dot.className = 'dot ' + (p.status === 'online' ? 'online' : 'offline');
+
+    var name = document.createElement('span');
+    name.className = 'peer-name-text';
+    name.textContent = p.peer_name;
+
+    var status = document.createElement('span');
+    status.className = 'peer-status-text';
+    status.textContent = p.status_message || (p.last_seen ? timeAgo(p.last_seen) : '');
+
+    // Tooltip
+    var tt = document.createElement('span');
+    tt.className = 'tt-text';
+    var ttLines = p.peer_name + ' (' + p.status + ')';
+    if (p.status_message) ttLines += '\\nStatus: ' + p.status_message;
+    if (p.last_seen) ttLines += '\\nLast seen: ' + p.last_seen;
+    tt.textContent = ttLines;
+
+    div.appendChild(dot);
+    div.appendChild(name);
+    div.appendChild(status);
+    div.appendChild(tt);
+    el.appendChild(div);
+  });
 }
 
-function escapeHtml(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+// ---- Render channels ----
+function renderChannels() {
+  var el = document.getElementById('channels-list');
+  el.innerHTML = '';
+
+  // "All Messages" item
+  var allItem = document.createElement('div');
+  allItem.className = 'channel-item' + (currentChannel === null ? ' active' : '') + ' channel-all';
+  allItem.setAttribute('data-channel', '');
+  var allName = document.createElement('span');
+  allName.className = 'ch-name';
+  allName.textContent = 'All Messages';
+  allItem.appendChild(allName);
+  // Total unread
+  var totalUnread = allChannels.reduce(function(s, c) { return s + (c._clientUnread || 0); }, 0);
+  if (totalUnread > 0) {
+    var badge = document.createElement('span');
+    badge.className = 'ch-badge';
+    badge.textContent = totalUnread;
+    allItem.appendChild(badge);
+  }
+  el.appendChild(allItem);
+
+  // Sort: #general first, then by last_activity desc
+  var sorted = allChannels.slice().sort(function(a, b) {
+    if (a.name === 'general') return -1;
+    if (b.name === 'general') return 1;
+    var ta = a.last_activity || '';
+    var tb = b.last_activity || '';
+    return tb.localeCompare(ta);
+  });
+
+  sorted.forEach(function(c) {
+    var div = document.createElement('div');
+    div.className = 'channel-item';
+    if (currentChannel === c.name) div.className += ' active';
+    if (c.name === 'general') div.className += ' broadcast';
+    div.setAttribute('data-channel', c.name);
+
+    var nameSpan = document.createElement('span');
+    nameSpan.className = 'ch-name';
+    if (c.name === 'general') {
+      var icon = document.createElement('span');
+      icon.className = 'ch-icon';
+      icon.textContent = '\\u{1F4E2} ';
+      nameSpan.appendChild(icon);
+    }
+    var chText = document.createTextNode('#' + c.name);
+    nameSpan.appendChild(chText);
+    div.appendChild(nameSpan);
+
+    if (c._clientUnread > 0) {
+      var badge = document.createElement('span');
+      badge.className = 'ch-badge';
+      badge.textContent = c._clientUnread;
+      div.appendChild(badge);
+    }
+
+    el.appendChild(div);
+  });
+
+  // Update datalist for compose
+  var dl = document.getElementById('ch-datalist');
+  dl.innerHTML = '';
+  sorted.forEach(function(c) {
+    var opt = document.createElement('option');
+    opt.value = c.name;
+    dl.appendChild(opt);
+  });
 }
 
-function filterChannel(name) {
-  currentChannel = name;
-  refresh();
+// ---- Render messages ----
+function renderMessages(scrollToBottom) {
+  var el = document.getElementById('messages-list');
+  var header = document.getElementById('msg-header');
+  header.textContent = currentChannel ? '#' + currentChannel : 'All Messages';
+
+  // Was user at bottom?
+  var atBottom = scrollToBottom || (el.scrollHeight - el.scrollTop - el.clientHeight < 60);
+
+  var filtered = currentChannel
+    ? allMessages.filter(function(m) { return m.channel === currentChannel; })
+    : allMessages;
+
+  el.innerHTML = '';
+
+  if (!filtered.length) {
+    var empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'No messages yet';
+    el.appendChild(empty);
+    // Check for onboarding
+    if (!hasOnboarded && allMessages.length === 0) showOnboarding(el);
+    return;
+  }
+
+  // Load more button
+  if (filtered.length >= 50 || oldestMsgId < Infinity) {
+    var loadBtn = document.createElement('button');
+    loadBtn.className = 'load-more-btn';
+    loadBtn.textContent = 'Load older messages';
+    loadBtn.id = 'load-more-btn';
+    el.appendChild(loadBtn);
+  }
+
+  // Group consecutive messages from same sender within 2 min
+  for (var i = 0; i < filtered.length; i++) {
+    var m = filtered[i];
+    var prev = i > 0 ? filtered[i-1] : null;
+    var grouped = prev && prev.sender === m.sender && prev.channel === m.channel;
+    if (grouped) {
+      var timeDiff = new Date(m.timestamp).getTime() - new Date(prev.timestamp).getTime();
+      if (timeDiff > 120000) grouped = false;
+    }
+
+    var msgDiv = document.createElement('div');
+    msgDiv.className = 'msg' + (grouped ? ' msg-grouped' : '');
+    msgDiv.setAttribute('data-msg-id', m.id);
+
+    if (!grouped) {
+      var hdr = document.createElement('div');
+      hdr.className = 'msg-header';
+
+      var sender = document.createElement('span');
+      sender.className = 'msg-sender' + (m.sender === myName ? ' is-you' : '');
+      sender.textContent = m.sender;
+      hdr.appendChild(sender);
+
+      if (!currentChannel) {
+        var chTag = document.createElement('span');
+        chTag.className = 'msg-ch-tag';
+        chTag.textContent = '#' + m.channel;
+        hdr.appendChild(chTag);
+      }
+
+      var timeSpan = document.createElement('span');
+      timeSpan.className = 'msg-time';
+      timeSpan.textContent = timeAgo(m.timestamp);
+      timeSpan.title = m.timestamp;
+      hdr.appendChild(timeSpan);
+
+      msgDiv.appendChild(hdr);
+    }
+
+    var body = document.createElement('div');
+    body.className = 'msg-body';
+    body.innerHTML = formatContent(m.content);
+    msgDiv.appendChild(body);
+
+    el.appendChild(msgDiv);
+  }
+
+  // Smooth scroll to bottom if user was at bottom
+  if (atBottom) {
+    el.scrollTop = el.scrollHeight;
+  }
 }
 
-async function refresh() {
-  const data = await fetchData();
+function showOnboarding(container) {
+  hasOnboarded = true;
+  var relayUrl = window.location.origin + '/mcp';
+  container.innerHTML = '';
+  var ob = document.createElement('div');
+  ob.className = 'onboarding';
+
+  var h2 = document.createElement('h2');
+  h2.textContent = 'Welcome to Agentic Chat';
+  ob.appendChild(h2);
+
+  var p1 = document.createElement('p');
+  p1.textContent = 'You are signed in as ' + myName + ' in the ' + myNamespace + ' namespace.';
+  ob.appendChild(p1);
+
+  var step1 = document.createElement('div');
+  step1.className = 'step';
+  var s1h = document.createElement('h3');
+  s1h.textContent = '1. Connect Claude Code';
+  step1.appendChild(s1h);
+  var s1p = document.createElement('p');
+  s1p.textContent = 'Run this command in your terminal to connect a Claude Code session:';
+  step1.appendChild(s1p);
+  var cmdBlock = document.createElement('div');
+  cmdBlock.className = 'cmd-block';
+  var cmdText = 'claude mcp add --transport http --header "Authorization: Bearer YOUR_TOKEN" -- relay ' + relayUrl;
+  cmdBlock.textContent = cmdText;
+  var copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-btn';
+  copyBtn.textContent = 'Copy';
+  copyBtn.addEventListener('click', function() {
+    navigator.clipboard.writeText(cmdText).then(function() { copyBtn.textContent = 'Copied!'; setTimeout(function() { copyBtn.textContent = 'Copy'; }, 1500); });
+  });
+  cmdBlock.appendChild(copyBtn);
+  step1.appendChild(cmdBlock);
+  ob.appendChild(step1);
+
+  var step2 = document.createElement('div');
+  step2.className = 'step';
+  var s2h = document.createElement('h3');
+  s2h.textContent = '2. Invite others';
+  step2.appendChild(s2h);
+  var s2p = document.createElement('p');
+  s2p.textContent = 'Create tokens for other peers using the CLI on the server:';
+  step2.appendChild(s2p);
+  var cmd2 = document.createElement('div');
+  cmd2.className = 'cmd-block';
+  cmd2.textContent = 'python relay.py token create --name PEER_NAME --url ' + window.location.origin;
+  var copy2 = document.createElement('button');
+  copy2.className = 'copy-btn';
+  copy2.textContent = 'Copy';
+  copy2.addEventListener('click', function() {
+    var t = cmd2.textContent.replace('Copy', '').trim();
+    navigator.clipboard.writeText(t).then(function() { copy2.textContent = 'Copied!'; setTimeout(function() { copy2.textContent = 'Copy'; }, 1500); });
+  });
+  cmd2.appendChild(copy2);
+  step2.appendChild(cmd2);
+  ob.appendChild(step2);
+
+  var step3 = document.createElement('div');
+  step3.className = 'step';
+  var s3h = document.createElement('h3');
+  s3h.textContent = '3. Start chatting';
+  step3.appendChild(s3h);
+  var s3p = document.createElement('p');
+  s3p.textContent = 'Use the compose bar below to send your first message to #general, or tell Claude Code to "check the relay".';
+  step3.appendChild(s3p);
+  ob.appendChild(step3);
+
+  container.appendChild(ob);
+}
+
+// ---- Client-side unread tracking ----
+function loadLastSeen() {
+  try {
+    var stored = localStorage.getItem('relay_lastSeen_' + myName);
+    if (stored) lastSeenPerChannel = JSON.parse(stored);
+  } catch(e) {}
+}
+
+function saveLastSeen() {
+  try {
+    localStorage.setItem('relay_lastSeen_' + myName, JSON.stringify(lastSeenPerChannel));
+  } catch(e) {}
+}
+
+function computeClientUnread() {
+  allChannels.forEach(function(c) {
+    var maxSeen = lastSeenPerChannel[c.name] || 0;
+    var msgs = allMessages.filter(function(m) { return m.channel === c.name && m.id > maxSeen; });
+    c._clientUnread = msgs.length;
+  });
+}
+
+function markChannelRead(channelName) {
+  if (!channelName) return;
+  var maxId = 0;
+  allMessages.forEach(function(m) {
+    if (m.channel === channelName && m.id > maxId) maxId = m.id;
+  });
+  if (maxId > (lastSeenPerChannel[channelName] || 0)) {
+    lastSeenPerChannel[channelName] = maxId;
+    saveLastSeen();
+  }
+}
+
+// ---- Main refresh ----
+async function refresh(force) {
+  var data = await fetchDashboardData();
+  updateConnStatus();
+
   if (!data) return false;
   if (data._unauth) {
     showLogin('Invalid or expired token. Please sign in again.');
     return false;
   }
-  document.getElementById('ns-label').textContent = data.namespace || 'default';
-  renderPeers(data.peers);
-  renderChannels(data.channels);
-  renderMessages(data.messages);
+
+  myName = data.you || '';
+  myNamespace = data.namespace || 'default';
+  document.getElementById('header-user').textContent = myName + ' @ ' + myNamespace;
+
+  allPeers = data.peers || [];
+  allChannels = data.channels || [];
+
+  // Merge messages (keep old + add new)
+  var newMsgIds = new Set();
+  var newMessages = [];
+  (data.messages || []).forEach(function(m) {
+    newMsgIds.add(m.id);
+    if (!knownMsgIds.has(m.id)) {
+      newMessages.push(m);
+      knownMsgIds.add(m.id);
+    }
+  });
+
+  // Detect truly new messages for notifications (not first load)
+  if (allMessages.length > 0 && newMessages.length > 0) {
+    newMessages.forEach(function(m) {
+      if (m.sender !== myName) {
+        playPing();
+        showNotif(m.sender + ' in #' + m.channel, m.content.substring(0, 120));
+      }
+    });
+  }
+
+  // Build full message list from API response + any older loaded messages
+  var apiMsgMap = {};
+  (data.messages || []).forEach(function(m) { apiMsgMap[m.id] = m; });
+  // Keep older messages we loaded via "load more" that aren't in latest API batch
+  var merged = [];
+  allMessages.forEach(function(m) {
+    if (!apiMsgMap[m.id]) merged.push(m);
+  });
+  (data.messages || []).forEach(function(m) { merged.push(m); });
+  merged.sort(function(a, b) { return a.id - b.id; });
+  allMessages = merged;
+
+  // Track oldest for "load more"
+  if (allMessages.length > 0) {
+    oldestMsgId = allMessages[0].id;
+  }
+
+  loadLastSeen();
+  // Auto-mark current channel as read
+  if (currentChannel) markChannelRead(currentChannel);
+  computeClientUnread();
+  updateTitle();
+
+  renderPeers();
+  renderChannels();
+  renderMessages();
+
   return true;
 }
 
-// On load: if we have a token, try to use it; otherwise show login
-(async () => {
-  if (getToken()) {
-    const ok = await refresh();
+// ---- Login / Auth ----
+function showLogin(err) {
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-error').textContent = err || '';
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+
+function showApp() {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  requestNotifPermission();
+}
+
+document.getElementById('login-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var t = document.getElementById('token-input').value.trim();
+  if (!t) return;
+  token = t;
+  sessionStorage.setItem('relay_token', t);
+  // Reset state
+  knownMsgIds = new Set();
+  allMessages = [];
+  oldestMsgId = Infinity;
+  hasOnboarded = false;
+
+  var ok = await refresh(true);
+  if (ok) {
+    showApp();
+    if (!refreshTimer) refreshTimer = setInterval(refresh, 3000);
+  } else {
+    showLogin('Could not connect. Check your token.');
+  }
+});
+
+document.getElementById('sign-out-btn').addEventListener('click', function() {
+  token = null;
+  sessionStorage.removeItem('relay_token');
+  knownMsgIds = new Set();
+  allMessages = [];
+  allPeers = [];
+  allChannels = [];
+  showLogin();
+});
+
+// ---- Channel selection (event delegation, no inline onclick) ----
+document.getElementById('channels-list').addEventListener('click', function(e) {
+  var item = e.target.closest('.channel-item');
+  if (!item) return;
+  var ch = item.getAttribute('data-channel');
+  currentChannel = ch || null;
+  if (currentChannel) markChannelRead(currentChannel);
+  computeClientUnread();
+  updateTitle();
+  renderChannels();
+  renderMessages(true);
+  // Update compose channel
+  document.getElementById('compose-ch').value = currentChannel || '';
+  closeSidebar();
+});
+
+// ---- Peer click -> DM ----
+document.getElementById('peers-list').addEventListener('click', function(e) {
+  var item = e.target.closest('.peer-item');
+  if (!item) return;
+  var peer = item.getAttribute('data-peer');
+  if (peer === myName) return;
+  var names = [myName.toLowerCase(), peer.toLowerCase()].sort();
+  var dmChannel = 'dm-' + names[0] + '-' + names[1];
+  currentChannel = dmChannel;
+  document.getElementById('compose-ch').value = dmChannel;
+  computeClientUnread();
+  updateTitle();
+  renderChannels();
+  renderMessages(true);
+  closeSidebar();
+});
+
+// ---- Load more history ----
+document.getElementById('messages-list').addEventListener('click', async function(e) {
+  if (e.target.id !== 'load-more-btn') return;
+  if (isLoadingMore) return;
+  isLoadingMore = true;
+  e.target.textContent = 'Loading...';
+  e.target.disabled = true;
+
+  var data = await fetchOlderMessages(oldestMsgId);
+  isLoadingMore = false;
+  if (data && data.messages) {
+    data.messages.forEach(function(m) {
+      if (!knownMsgIds.has(m.id)) {
+        knownMsgIds.add(m.id);
+        allMessages.push(m);
+      }
+    });
+    allMessages.sort(function(a, b) { return a.id - b.id; });
+    if (allMessages.length > 0) oldestMsgId = allMessages[0].id;
+    renderMessages();
+  } else {
+    e.target.textContent = 'No older messages';
+  }
+});
+
+// ---- Send message ----
+async function doSend() {
+  var chInput = document.getElementById('compose-ch');
+  var msgInput = document.getElementById('compose-msg');
+  var ch = chInput.value.trim().replace(/^#/, '');
+  var content = msgInput.value.trim();
+  if (!ch) ch = currentChannel || 'general';
+  if (!content) return;
+
+  var btn = document.getElementById('compose-send');
+  btn.disabled = true;
+
+  var result = await sendMessage(ch, content);
+  btn.disabled = false;
+  if (result && result.ok) {
+    msgInput.value = '';
+    msgInput.style.height = 'auto';
+    // Refresh immediately to see the message
+    await refresh();
+    renderMessages(true);
+  } else {
+    var errText = result ? (result.error || 'Send failed') : 'Network error';
+    alert(errText);
+  }
+}
+
+document.getElementById('compose-send').addEventListener('click', doSend);
+document.getElementById('compose-msg').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    doSend();
+  }
+});
+
+// Auto-grow textarea
+document.getElementById('compose-msg').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// ---- Create channel modal ----
+document.getElementById('create-channel-btn').addEventListener('click', function() {
+  document.getElementById('modal-create-ch').style.display = 'flex';
+  document.getElementById('new-ch-name').value = '';
+  document.getElementById('new-ch-name').focus();
+});
+document.getElementById('modal-ch-cancel').addEventListener('click', function() {
+  document.getElementById('modal-create-ch').style.display = 'none';
+});
+document.getElementById('modal-ch-confirm').addEventListener('click', async function() {
+  var name = document.getElementById('new-ch-name').value.trim().replace(/^#/, '');
+  if (!name) return;
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9-]{0,63}$/.test(name)) {
+    alert('Channel name must be alphanumeric with hyphens, 1-64 chars.');
+    return;
+  }
+  document.getElementById('modal-create-ch').style.display = 'none';
+  var result = await sendMessage(name, 'Channel created');
+  if (result && result.ok) {
+    currentChannel = name;
+    document.getElementById('compose-ch').value = name;
+    await refresh();
+    renderMessages(true);
+  }
+});
+document.getElementById('new-ch-name').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('modal-ch-confirm').click();
+  }
+});
+// Close modal on backdrop click
+document.getElementById('modal-create-ch').addEventListener('click', function(e) {
+  if (e.target === this) this.style.display = 'none';
+});
+
+// ---- Mobile sidebar toggle ----
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').classList.remove('open');
+}
+document.getElementById('hamburger-btn').addEventListener('click', function() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-backdrop').classList.toggle('open');
+});
+document.getElementById('sidebar-backdrop').addEventListener('click', closeSidebar);
+
+// ---- Boot ----
+(async function() {
+  if (token) {
+    var ok = await refresh(true);
     if (ok) {
-      showDashboard();
+      showApp();
       refreshTimer = setInterval(refresh, 3000);
     } else {
       showLogin();
@@ -1446,6 +2138,8 @@ async function refresh() {
   } else {
     showLogin();
   }
+})();
+
 })();
 </script>
 </body>
@@ -1479,7 +2173,8 @@ async def _authenticate_dashboard_request(request: Request) -> dict | None:
 @mcp.custom_route("/dashboard/api", methods=["GET"])
 async def dashboard_api(request: Request) -> JSONResponse:
     """JSON API for the dashboard. Requires a valid bearer token.
-    Returns peers, channels, and recent messages scoped to the caller's namespace."""
+    Returns peers, channels, and recent messages scoped to the caller's namespace.
+    Supports ?before_id=N&limit=M for pagination (load older messages)."""
     caller = await _authenticate_dashboard_request(request)
     if caller is None:
         return JSONResponse(
@@ -1487,6 +2182,12 @@ async def dashboard_api(request: Request) -> JSONResponse:
             status_code=401,
         )
     ns = caller["namespace"]
+
+    # Parse optional pagination params
+    before_id_str = request.query_params.get("before_id")
+    limit_str = request.query_params.get("limit")
+    before_id = int(before_id_str) if before_id_str and before_id_str.isdigit() else None
+    limit = min(int(limit_str), 200) if limit_str and limit_str.isdigit() else 100
 
     # Peers in this namespace only
     peers = await db.fetchall(
@@ -1521,22 +2222,33 @@ async def dashboard_api(request: Request) -> JSONResponse:
             "name": c["name"],
             "namespace": c["namespace"],
             "total_messages": c["total_messages"],
-            "unread": 0,  # dashboard doesn't track its own cursors
+            "unread": 0,
             "last_activity": ms_to_iso(c["last_activity"]) if c["last_activity"] else None,
         }
         for c in channels
     ]
 
-    # Recent messages in this namespace only (last 100)
-    messages = await db.fetchall(
-        "SELECT m.message_id, m.sender_name, m.content, m.created_at, "
-        "c.name AS channel_name, m.namespace "
-        "FROM messages m "
-        "JOIN channels c ON c.channel_id = m.channel_id "
-        "WHERE m.namespace = ? "
-        "ORDER BY m.message_id DESC LIMIT 100",
-        (ns,),
-    )
+    # Messages: support before_id for pagination
+    if before_id is not None:
+        messages = await db.fetchall(
+            "SELECT m.message_id, m.sender_name, m.content, m.created_at, "
+            "c.name AS channel_name, m.namespace "
+            "FROM messages m "
+            "JOIN channels c ON c.channel_id = m.channel_id "
+            "WHERE m.namespace = ? AND m.message_id < ? "
+            "ORDER BY m.message_id DESC LIMIT ?",
+            (ns, before_id, limit),
+        )
+    else:
+        messages = await db.fetchall(
+            "SELECT m.message_id, m.sender_name, m.content, m.created_at, "
+            "c.name AS channel_name, m.namespace "
+            "FROM messages m "
+            "JOIN channels c ON c.channel_id = m.channel_id "
+            "WHERE m.namespace = ? "
+            "ORDER BY m.message_id DESC LIMIT ?",
+            (ns, limit),
+        )
     messages.reverse()  # chronological order
     msg_list = [
         {
@@ -1556,6 +2268,100 @@ async def dashboard_api(request: Request) -> JSONResponse:
         "peers": peer_list,
         "channels": channel_list,
         "messages": msg_list,
+    })
+
+
+@mcp.custom_route("/dashboard/api/send", methods=["POST"])
+async def dashboard_api_send(request: Request) -> JSONResponse:
+    """Send a message from the dashboard. Accepts JSON {channel, content} with Bearer auth."""
+    caller = await _authenticate_dashboard_request(request)
+    if caller is None:
+        return JSONResponse(
+            {"error": "Unauthorized", "hint": "Provide a valid Bearer token."},
+            status_code=401,
+        )
+    ns = caller["namespace"]
+    me = caller["peer_name"]
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Invalid JSON body."},
+            status_code=400,
+        )
+
+    channel = body.get("channel", "").strip()
+    content = body.get("content", "").strip()
+
+    if not channel:
+        return JSONResponse(
+            {"ok": False, "error": "Channel name is required."},
+            status_code=400,
+        )
+
+    if not CHANNEL_NAME_RE.match(channel):
+        return JSONResponse(
+            {"ok": False, "error": "Channel name must be 1-64 chars, alphanumeric and hyphens only."},
+            status_code=400,
+        )
+
+    if not content:
+        return JSONResponse(
+            {"ok": False, "error": "Message content cannot be empty."},
+            status_code=400,
+        )
+
+    max_len = CONFIG.get("max_message_length", 50000)
+    if len(content) > max_len:
+        return JSONResponse(
+            {"ok": False, "error": f"Message exceeds maximum length of {max_len} characters."},
+            status_code=400,
+        )
+
+    # Normalize DM channel names
+    channel, dm_error = normalize_channel(channel)
+    if dm_error:
+        return JSONResponse(
+            {"ok": False, "error": dm_error},
+            status_code=400,
+        )
+
+    # Auto-create channel
+    await db.execute(
+        "INSERT OR IGNORE INTO channels (namespace, name, created_by, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (ns, channel, me, now_ms()),
+    )
+
+    ch = await db.fetchone(
+        "SELECT channel_id FROM channels WHERE namespace = ? AND name = ?",
+        (ns, channel),
+    )
+    if not ch:
+        return JSONResponse(
+            {"ok": False, "error": "Failed to create channel."},
+            status_code=500,
+        )
+
+    now = now_ms()
+    cursor = await db.execute(
+        "INSERT INTO messages (channel_id, sender_name, namespace, content, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (ch["channel_id"], me, ns, content, now),
+    )
+    message_id = cursor.lastrowid
+
+    log.info(
+        "Dashboard send: %s/%s -> %s (id=%d, len=%d)",
+        ns, me, channel, message_id, len(content),
+    )
+
+    return JSONResponse({
+        "ok": True,
+        "message_id": message_id,
+        "channel": channel,
+        "timestamp": ms_to_iso(now),
     })
 
 

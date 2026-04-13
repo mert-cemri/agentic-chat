@@ -1,11 +1,15 @@
-"""CLI: init, token create/list/revoke, check, main()."""
+"""CLI: init, token create/list/revoke, check, demo, agent, main()."""
 
 import argparse
 import hashlib
 import json
 import logging
+import os
 import secrets
+import shutil
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 from .config import DEFAULT_CONFIG, load_config, validate_config, now_ms, ms_to_iso
@@ -240,10 +244,293 @@ def cmd_check(args: argparse.Namespace) -> None:
     print("\nDeployment check complete.")
 
 
+def _find_cloudflared() -> str | None:
+    """Return the path to cloudflared if available, else None."""
+    path = shutil.which("cloudflared")
+    if path:
+        return path
+    tmp_path = "/tmp/cloudflared"
+    if os.path.isfile(tmp_path) and os.access(tmp_path, os.X_OK):
+        return tmp_path
+    return None
+
+
+def _start_tunnel(port: int) -> tuple[subprocess.Popen | None, str | None]:
+    """Start a cloudflared tunnel and wait for the public URL.
+
+    Returns (process, tunnel_url) or (None, None) if cloudflared is unavailable.
+    """
+    cf_bin = _find_cloudflared()
+    if cf_bin is None:
+        print("\n[tunnel] cloudflared not found on PATH or at /tmp/cloudflared.")
+        print("[tunnel] Install it to enable tunnels:")
+        print("  curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared && chmod +x /tmp/cloudflared")
+        print("[tunnel] Continuing without tunnel -- server is available on localhost.\n")
+        return None, None
+
+    log.info("Starting cloudflared tunnel on port %d...", port)
+    proc = subprocess.Popen(
+        [cf_bin, "tunnel", "--url", f"http://localhost:{port}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    # Wait up to 15 seconds for the tunnel URL to appear in stderr
+    import select
+    tunnel_url = None
+    deadline = time.monotonic() + 15
+    partial = ""
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        ready, _, _ = select.select([proc.stderr], [], [], min(remaining, 0.5))
+        if ready:
+            chunk = proc.stderr.read1(4096) if hasattr(proc.stderr, "read1") else ""
+            if not chunk:
+                # stderr uses TextIOWrapper -- try readline
+                line = proc.stderr.readline()
+                if line:
+                    partial += line
+            else:
+                partial += chunk
+        else:
+            # Try a non-blocking readline
+            try:
+                line = proc.stderr.readline()
+                if line:
+                    partial += line
+            except Exception:
+                pass
+
+        # Look for the trycloudflare.com URL in accumulated output
+        import re
+        m = re.search(r"https://[a-zA-Z0-9_-]+\.trycloudflare\.com", partial)
+        if m:
+            tunnel_url = m.group(0)
+            break
+
+        if proc.poll() is not None:
+            log.warning("cloudflared exited prematurely (code %d)", proc.returncode)
+            break
+
+    if tunnel_url:
+        log.info("Tunnel URL: %s", tunnel_url)
+    else:
+        log.warning("Could not detect tunnel URL within 15 seconds")
+
+    return proc, tunnel_url
+
+
+def cmd_demo(args: argparse.Namespace) -> None:
+    """Run a fully self-contained demo: create temp DB, tokens, and start server."""
+    import sqlite3
+
+    port = getattr(args, "port", 4444) or 4444
+    use_tunnel = getattr(args, "tunnel", False)
+
+    # Create temporary data directory
+    data_dir = Path("./data/demo")
+    data_dir.mkdir(parents=True, exist_ok=True)
+    db_path = str(data_dir / "relay.db")
+
+    # Initialize DB
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executescript(SCHEMA_SQL)
+        conn.execute("UPDATE peers SET status = 'offline'")
+
+        # Create two demo tokens
+        tokens = {}
+        for name in ("user1", "user2"):
+            raw_token = f"relay_tok_{secrets.token_urlsafe(32)}"
+            token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+            conn.execute(
+                "INSERT OR REPLACE INTO tokens (token_hash, peer_name, namespace, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (token_hash, name, "default", now_ms()),
+            )
+            tokens[name] = raw_token
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    log.info("Demo DB initialized at %s with 2 tokens", db_path)
+
+    # Build config for this demo run
+    import agentic_chat.config as config_module
+    config_module.CONFIG.update(DEFAULT_CONFIG)
+    config_module.CONFIG["db_path"] = db_path
+    config_module.CONFIG["port"] = port
+
+    # Start tunnel if requested
+    tunnel_proc = None
+    tunnel_url = None
+    if use_tunnel:
+        tunnel_proc, tunnel_url = _start_tunnel(port)
+        if tunnel_url:
+            config_module.CONFIG["public_url"] = tunnel_url
+
+    base_url = tunnel_url or f"http://localhost:{port}"
+
+    # Print the demo box
+    _print_demo_box(base_url, tokens, port)
+    sys.stdout.flush()
+
+    # Now start the server
+    try:
+        from .server import cmd_serve as _serve
+        # Prepare a namespace for serve -- config is already loaded into CONFIG
+        serve_args = argparse.Namespace(tunnel=False)  # tunnel already started
+        _serve(serve_args, skip_config_load=True)
+    finally:
+        if tunnel_proc:
+            log.info("Stopping cloudflared tunnel...")
+            tunnel_proc.terminate()
+            try:
+                tunnel_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                tunnel_proc.kill()
+
+
+def _print_demo_box(base_url: str, tokens: dict[str, str], port: int) -> None:
+    """Print a formatted demo information box."""
+    mcp_url = f"{base_url}/mcp"
+    dashboard_url = f"{base_url}/dashboard"
+    dashboard_token = tokens["user1"]
+
+    cmd1 = (
+        f'claude mcp add --transport http '
+        f'-H "Authorization: Bearer {tokens["user1"]}" '
+        f'-- relay {mcp_url}'
+    )
+    cmd2 = (
+        f'claude mcp add --transport http '
+        f'-H "Authorization: Bearer {tokens["user2"]}" '
+        f'-- relay {mcp_url}'
+    )
+
+    # Calculate box width based on longest line
+    lines_content = [
+        "Agentic Chat Demo",
+        "",
+        f"  Dashboard: {dashboard_url}",
+        f"  Dashboard token (user1): {dashboard_token}",
+        "",
+        "  -- Connect Claude Code " + "-" * 30,
+        "",
+        "  Terminal 1 (user1):",
+        f"  {cmd1}",
+        "",
+        "  Terminal 2 (user2):",
+        f"  {cmd2}",
+        "",
+        '  Then in each Claude session, say: "check the relay"',
+        "",
+    ]
+
+    max_len = max(len(line) for line in lines_content)
+    w = max_len + 4  # padding
+
+    def pad(text: str) -> str:
+        return f"\u2551  {text}{' ' * (w - len(text) - 4)}  \u2551"
+
+    print()
+    print(f"\u2554{'=' * (w)}{'=' * 2}\u2557")
+    print(pad(lines_content[0]))
+    print(f"\u2560{'=' * (w)}{'=' * 2}\u2563")
+    for line in lines_content[1:]:
+        print(pad(line))
+    print(f"\u255a{'=' * (w)}{'=' * 2}\u255d")
+    print()
+
+
 def cmd_serve(args: argparse.Namespace) -> None:
     """Start the relay server (delegates to server module)."""
     from .server import cmd_serve as _serve
-    _serve(args)
+
+    use_tunnel = getattr(args, "tunnel", False)
+
+    if use_tunnel:
+        import agentic_chat.config as config_module
+        config_module.CONFIG.update(load_config())
+        validate_config(config_module.CONFIG)
+        port = config_module.CONFIG["port"]
+
+        tunnel_proc, tunnel_url = _start_tunnel(port)
+        if tunnel_url:
+            config_module.CONFIG["public_url"] = tunnel_url
+            print(f"\n[tunnel] Public URL: {tunnel_url}")
+            print(f"[tunnel] MCP endpoint: {tunnel_url}/mcp")
+            print(f"[tunnel] Dashboard: {tunnel_url}/dashboard\n")
+
+        try:
+            _serve(args, skip_config_load=True)
+        finally:
+            if tunnel_proc:
+                log.info("Stopping cloudflared tunnel...")
+                tunnel_proc.terminate()
+                try:
+                    tunnel_proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    tunnel_proc.kill()
+    else:
+        _serve(args)
+
+
+def cmd_agent(args: argparse.Namespace) -> None:
+    """Run the autonomous agent (delegates to agent module)."""
+    # Import the agent module from the repo root
+    agent_path = Path(__file__).resolve().parent.parent.parent / "agent.py"
+    if not agent_path.exists():
+        print(f"Error: agent.py not found at {agent_path}", file=sys.stderr)
+        sys.exit(1)
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("agent", str(agent_path))
+    agent_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(agent_mod)
+
+    cwd = str(Path(args.cwd).resolve())
+    if not Path(cwd).is_dir():
+        print(f"Error: working directory does not exist: {cwd}", file=sys.stderr)
+        sys.exit(1)
+
+    allowed_tools = [t.strip() for t in args.tools.split(",")]
+
+    import asyncio
+
+    async def _run():
+        relay = agent_mod.RelayClient(args.url, args.token)
+        try:
+            await relay.connect()
+
+            if not args.quiet:
+                await relay.send_message(
+                    "general",
+                    f"Agent `{relay.peer_name}` is now online and monitoring for tasks. "
+                    f"DM me or @{relay.peer_name} in any channel to assign work."
+                )
+
+            await agent_mod.agent_loop(
+                relay=relay,
+                cwd=cwd,
+                poll_interval=args.poll_interval,
+                allowed_tools=allowed_tools,
+                max_turns=args.max_turns,
+                model=args.model,
+                watch_channels=args.watch,
+            )
+        except KeyboardInterrupt:
+            log.info("Agent shutting down...")
+            await relay.send_message(
+                "general",
+                f"Agent `{relay.peer_name}` is going offline.",
+            )
+        finally:
+            await relay.close()
+
+    asyncio.run(_run())
 
 
 def main() -> None:
@@ -254,7 +541,24 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("init", help="First-time setup")
-    subparsers.add_parser("serve", help="Start the relay server")
+
+    serve_parser = subparsers.add_parser("serve", help="Start the relay server")
+    serve_parser.add_argument(
+        "--tunnel", action="store_true",
+        help="Start a cloudflared tunnel for public access",
+    )
+
+    demo_parser = subparsers.add_parser(
+        "demo", help="One-command demo: creates DB, tokens, and starts server"
+    )
+    demo_parser.add_argument(
+        "--port", type=int, default=4444,
+        help="Port to run the demo server on (default: 4444)",
+    )
+    demo_parser.add_argument(
+        "--tunnel", action="store_true",
+        help="Start a cloudflared tunnel for public access",
+    )
 
     token_parser = subparsers.add_parser("token", help="Token management")
     token_sub = token_parser.add_subparsers(dest="token_command")
@@ -281,12 +585,56 @@ def main() -> None:
         "--url", help="Server URL to test (e.g. https://relay.example.com)"
     )
 
+    agent_parser = subparsers.add_parser(
+        "agent",
+        help="Run an autonomous agent that monitors the relay and executes tasks",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    agent_parser.add_argument(
+        "--token", required=True,
+        help="Relay bearer token for this agent (relay_tok_...)",
+    )
+    agent_parser.add_argument(
+        "--url", required=True,
+        help="Relay server URL (e.g. http://localhost:4444)",
+    )
+    agent_parser.add_argument(
+        "--cwd", default=".",
+        help="Working directory for task execution (default: current directory)",
+    )
+    agent_parser.add_argument(
+        "--poll-interval", type=float, default=3.0,
+        help="Seconds between relay polls (default: 3.0)",
+    )
+    agent_parser.add_argument(
+        "--tools", default="Read,Edit,Write,Bash,Glob,Grep",
+        help="Comma-separated list of allowed Claude Code tools (default: Read,Edit,Write,Bash,Glob,Grep)",
+    )
+    agent_parser.add_argument(
+        "--max-turns", type=int, default=15,
+        help="Max agentic turns per task (default: 15)",
+    )
+    agent_parser.add_argument(
+        "--model", default=None,
+        help="Claude model to use (default: whatever Claude Code defaults to)",
+    )
+    agent_parser.add_argument(
+        "--watch", nargs="*", default=None,
+        help="Only watch specific channels (in addition to DMs and @mentions)",
+    )
+    agent_parser.add_argument(
+        "--quiet", action="store_true",
+        help="Don't announce presence on startup",
+    )
+
     args = parser.parse_args()
 
     if args.command == "init":
         cmd_init(args)
     elif args.command == "serve":
         cmd_serve(args)
+    elif args.command == "demo":
+        cmd_demo(args)
     elif args.command == "token":
         if args.token_command == "create":
             cmd_token_create(args)
@@ -298,6 +646,8 @@ def main() -> None:
             token_parser.print_help()
     elif args.command == "check":
         cmd_check(args)
+    elif args.command == "agent":
+        cmd_agent(args)
     else:
         parser.print_help()
 

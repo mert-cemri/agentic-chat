@@ -35,12 +35,13 @@ from . import tools  # noqa: E402, F401
 from . import dashboard  # noqa: E402, F401
 
 
-def cmd_serve(args: argparse.Namespace) -> None:
+def cmd_serve(args: argparse.Namespace, skip_config_load: bool = False) -> None:
     """Start the relay server."""
     global CONFIG
     import agentic_chat.config as config_module
-    config_module.CONFIG.update(load_config())
-    validate_config(config_module.CONFIG)
+    if not skip_config_load:
+        config_module.CONFIG.update(load_config())
+        validate_config(config_module.CONFIG)
 
     # Configure FastMCP transport security:
     # - The default DNS-rebinding protection only allows localhost variants.

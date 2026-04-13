@@ -249,13 +249,6 @@ async def agent_loop(
     else:
         log.info("Watching: DMs + @mentions + tasks channel")
 
-    # Send an initial announcement
-    await relay.send_message(
-        "general",
-        f"Agent `{relay.peer_name}` is now online and monitoring for tasks. "
-        f"DM me or @{relay.peer_name} in any channel to assign work."
-    )
-
     consecutive_errors = 0
     while True:
         try:
@@ -392,18 +385,23 @@ The agent executes each task via Claude Code and posts the result back.
         try:
             await relay.connect()
 
-            if args.quiet:
-                pass  # skip announcement
-            else:
-                await agent_loop(
-                    relay=relay,
-                    cwd=cwd,
-                    poll_interval=args.poll_interval,
-                    allowed_tools=allowed_tools,
-                    max_turns=args.max_turns,
-                    model=args.model,
-                    watch_channels=args.watch,
+            # --quiet only suppresses the startup announcement, not the loop
+            if not args.quiet:
+                await relay.send_message(
+                    "general",
+                    f"Agent `{relay.peer_name}` is now online and monitoring for tasks. "
+                    f"DM me or @{relay.peer_name} in any channel to assign work."
                 )
+
+            await agent_loop(
+                relay=relay,
+                cwd=cwd,
+                poll_interval=args.poll_interval,
+                allowed_tools=allowed_tools,
+                max_turns=args.max_turns,
+                model=args.model,
+                watch_channels=args.watch,
+            )
         except KeyboardInterrupt:
             log.info("Agent shutting down...")
             await relay.send_message(

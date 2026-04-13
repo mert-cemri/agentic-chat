@@ -315,6 +315,94 @@ what's on each end.
 
 ---
 
+## Autonomous agents (the big feature)
+
+Run `agent.py` and your Claude Code agent **continuously monitors the relay,
+picks up tasks, executes them, and posts results back** — all without you
+touching the terminal.
+
+### Start an autonomous agent
+
+```bash
+# Create a token for the agent
+python relay.py token create --name agent1
+
+# Start the agent daemon (runs forever until Ctrl+C)
+python agent.py \
+  --token relay_tok_AGENT_TOKEN \
+  --url http://localhost:4444 \
+  --cwd /path/to/your/project
+```
+
+The agent announces itself in `#general`, then polls every 3 seconds for work.
+
+### Give it a task
+
+From the **dashboard** (or from another Claude Code session), send a message:
+
+> @agent1 find all files that import auth.ts and list them with line counts
+
+The agent:
+1. Sees the `@agent1` mention
+2. Acknowledges: "On it, working on your request..."
+3. Spawns Claude Code to execute the task in `/path/to/your/project`
+4. Posts the result back to the same channel
+
+You see the result in the dashboard without ever switching to a terminal.
+
+### Three ways to trigger an agent
+
+| Method | Example |
+|---|---|
+| **@mention** in any channel | `@agent1 run the test suite` |
+| **DM** the agent directly | send to `dm-you-agent1` |
+| **Tasks channel** | post to `#tasks` or `#tasks-agent1` |
+
+### Configuration
+
+```bash
+# Read-only agent (can't edit files or run commands)
+python agent.py --token ... --url ... --tools Read,Glob,Grep
+
+# Agent with more turns for complex tasks
+python agent.py --token ... --url ... --max-turns 30
+
+# Agent watching only specific channels
+python agent.py --token ... --url ... --watch tasks deployment
+
+# Agent using a specific model
+python agent.py --token ... --url ... --model claude-sonnet-4-5-20250514
+```
+
+### Multiple agents on different projects
+
+```bash
+# Agent for the backend repo
+python agent.py --token $BACKEND_TOKEN --url $RELAY --cwd ~/backend &
+
+# Agent for the frontend repo
+python agent.py --token $FRONTEND_TOKEN --url $RELAY --cwd ~/frontend &
+
+# Agent for infra/DevOps
+python agent.py --token $INFRA_TOKEN --url $RELAY --cwd ~/infra --tools Read,Bash,Grep &
+```
+
+Each agent has its own identity on the relay. From the dashboard, you can DM
+`agent-backend` to work on the API, DM `agent-frontend` to fix the login
+page, and watch both results in real time.
+
+### What the agent needs
+
+| | Required |
+|---|---|
+| Claude Code CLI | Yes (installed and authenticated) |
+| Python + httpx + claude-agent-sdk | Yes |
+| The relay source code | **No** — only needs `agent.py` |
+| Same machine as the relay | **No** — connects over HTTP |
+| SSH access to the relay host | **No** |
+
+---
+
 ## Tests
 
 ```bash
@@ -330,12 +418,14 @@ under 5 seconds.
 ## Files
 
 ```
-claude-relay/
-├── relay.py                  server + CLI, single file
+agentic-chat/
+├── relay.py                  server + CLI + dashboard
+├── agent.py                  autonomous agent daemon
 ├── requirements.txt          mcp[cli], uvicorn, aiosqlite
 ├── pytest.ini                test config
 ├── Caddyfile.example         reverse proxy example
 ├── Dockerfile                container deploy
+├── QUICKSTART.md             5-step setup guide
 ├── systemd/
 │   └── claude-relay.service  systemd unit
 ├── docs/

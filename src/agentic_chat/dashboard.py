@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+import secrets
 from pathlib import Path
 
 from starlette.requests import Request
@@ -10,7 +11,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from .server import mcp
 from .config import CONFIG, now_ms, ms_to_iso
 from . import db as _db_mod
-from .channels import CHANNEL_NAME_RE, normalize_channel
+from .channels import CHANNEL_NAME_RE, PEER_NAME_RE, normalize_channel
 
 log = logging.getLogger("relay")
 
@@ -290,9 +291,122 @@ async def dashboard_api_send(request: Request) -> JSONResponse:
     })
 
 
+@mcp.custom_route("/dashboard/api/invite", methods=["POST"])
+async def dashboard_api_invite(request: Request) -> JSONResponse:
+    """Create an invite link for a new peer. Requires Bearer auth."""
+    caller = await _authenticate_dashboard_request(request)
+    if caller is None:
+        return JSONResponse(
+            {"error": "Unauthorized", "hint": "Provide a valid Bearer token."},
+            status_code=401,
+        )
+    ns = caller["namespace"]
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Invalid JSON body."},
+            status_code=400,
+        )
+
+    name = body.get("name", "").strip()
+    if not name:
+        return JSONResponse(
+            {"ok": False, "error": "Peer name is required."},
+            status_code=400,
+        )
+
+    if not PEER_NAME_RE.match(name):
+        return JSONResponse(
+            {"ok": False, "error": "Peer name must be 1-32 chars, starting with alphanumeric, then alphanumeric/underscore/hyphen."},
+            status_code=400,
+        )
+
+    # Generate token and hash
+    raw_token = f"relay_tok_{secrets.token_urlsafe(32)}"
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    # Insert into tokens table
+    try:
+        await _db_mod.db.execute(
+            "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (token_hash, name, ns, now_ms()),
+        )
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Failed to create token (hash collision or database error)."},
+            status_code=500,
+        )
+
+    # Build relay URL
+    configured = CONFIG.get("public_url") if CONFIG else None
+    if configured:
+        base_url = configured.rstrip("/")
+    else:
+        base_url = f"{request.url.scheme}://{request.url.netloc}"
+
+    join_link = f"{base_url}/join/{raw_token}"
+    relay_url = f"{base_url}/mcp"
+    mcp_command = (
+        f'claude mcp add --transport http '
+        f'-H "Authorization: Bearer {raw_token}" '
+        f"-- relay {relay_url}"
+    )
+
+    log.info("Invite created: %s/%s by %s", ns, name, caller["peer_name"])
+
+    return JSONResponse({
+        "ok": True,
+        "peer_name": name,
+        "token": raw_token,
+        "join_link": join_link,
+        "mcp_command": mcp_command,
+    })
+
+
+@mcp.custom_route("/dashboard/api/me", methods=["GET"])
+async def dashboard_api_me(request: Request) -> JSONResponse:
+    """Return info about the authenticated caller."""
+    caller = await _authenticate_dashboard_request(request)
+    if caller is None:
+        return JSONResponse(
+            {"error": "Unauthorized", "hint": "Provide a valid Bearer token."},
+            status_code=401,
+        )
+
+    # Extract the raw token from the Authorization header
+    auth = request.headers.get("authorization", "")
+    raw_token = auth[7:].strip()  # already validated by _authenticate_dashboard_request
+
+    # Build relay URL
+    configured = CONFIG.get("public_url") if CONFIG else None
+    if configured:
+        relay_url = configured.rstrip("/")
+    else:
+        relay_url = f"{request.url.scheme}://{request.url.netloc}"
+
+    mcp_url = f"{relay_url}/mcp"
+    mcp_command = (
+        f'claude mcp add --transport http '
+        f'-H "Authorization: Bearer {raw_token}" '
+        f"-- relay {mcp_url}"
+    )
+
+    return JSONResponse({
+        "peer_name": caller["peer_name"],
+        "namespace": caller["namespace"],
+        "relay_url": relay_url,
+        "mcp_command": mcp_command,
+    })
+
+
 __all__ = [
     "join_page",
     "dashboard",
     "dashboard_api",
     "dashboard_api_send",
+    "dashboard_api_invite",
+    "dashboard_api_me",
 ]

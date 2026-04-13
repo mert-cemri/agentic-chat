@@ -14,7 +14,7 @@ a:hover{text-decoration:underline}
 
 /* Layout */
 .app{display:flex;height:100vh;flex-direction:column}
-.header{background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:100}
+.header{background:linear-gradient(180deg, #1c2128, #161b22);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
 .header-logo{color:var(--accent);font-weight:700;font-size:1.1em;white-space:nowrap}
 .header-meta{color:var(--text-secondary);font-size:0.8em;display:flex;align-items:center;gap:8px;margin-left:auto;white-space:nowrap}
 .header-meta .conn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
@@ -25,9 +25,9 @@ a:hover{text-decoration:underline}
   50%{box-shadow:0 0 0 4px rgba(63,185,80,0)}
 }
 .header-user{color:var(--accent);font-weight:600;font-size:0.85em}
-.sign-out-btn{color:var(--text-secondary);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.8em}
+.sign-out-btn{color:var(--text-secondary);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.8em;min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center}
 .sign-out-btn:hover{color:var(--text);border-color:var(--text-muted)}
-.hamburger{display:none;background:none;border:none;color:var(--text);font-size:1.4em;cursor:pointer;padding:4px 8px}
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:1.4em;cursor:pointer;padding:4px 8px;min-height:44px;min-width:44px}
 
 .main{display:flex;flex:1;overflow:hidden}
 
@@ -39,8 +39,8 @@ a:hover{text-decoration:underline}
 .sidebar-title button{background:none;border:1px solid var(--border);color:var(--text-secondary);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:0.9em;display:flex;align-items:center;justify-content:center;line-height:1}
 .sidebar-title button:hover{color:var(--text);border-color:var(--text-muted)}
 
-.peer-item{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:0.87em;cursor:pointer}
-.peer-item:hover{background:var(--bg-tertiary)}
+.peer-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:0.87em;cursor:pointer;transition:background 0.15s;min-height:44px}
+.peer-item:hover{background:#1c2128}
 .peer-item.is-you{opacity:0.7}
 .peer-item.is-you .peer-name-text::after{content:" (you)";color:var(--text-muted);font-size:0.8em;font-weight:normal}
 .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -49,8 +49,14 @@ a:hover{text-decoration:underline}
 .peer-name-text{font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peer-status-text{color:var(--text-secondary);font-size:0.78em;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-.channel-item{display:flex;align-items:center;padding:5px 8px;border-radius:6px;font-size:0.87em;cursor:pointer;gap:6px}
-.channel-item:hover{background:var(--bg-tertiary)}
+/* Peer avatar (small 24px) */
+.peer-avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.68em;font-weight:700;color:#fff;flex-shrink:0;text-transform:uppercase}
+
+/* Message avatar (32px) */
+.msg-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78em;font-weight:700;color:#fff;flex-shrink:0;text-transform:uppercase}
+
+.channel-item{display:flex;align-items:center;padding:6px 10px;border-radius:6px;font-size:0.87em;cursor:pointer;gap:6px;transition:background 0.15s;min-height:44px}
+.channel-item:hover{background:#1c2128}
 .channel-item.active{background:var(--bg-tertiary);color:var(--accent);font-weight:600}
 .channel-item .ch-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .channel-item .ch-badge{background:var(--accent-bg);color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72em;font-weight:600;flex-shrink:0}
@@ -58,28 +64,51 @@ a:hover{text-decoration:underline}
 .channel-item.broadcast .ch-icon{margin-right:2px}
 .channel-all{color:var(--text-secondary);margin-top:6px;border-top:1px solid var(--border);padding-top:8px}
 
+/* Channel highlight animation */
+@keyframes ch-highlight{
+  0%{background:rgba(88,166,255,0.2)}
+  100%{background:var(--bg-tertiary)}
+}
+.channel-item.ch-flash{animation:ch-highlight 0.4s ease-out}
+
 .sidebar-empty-hint{color:var(--text-muted);font-size:0.8em;padding:8px 6px;line-height:1.4}
 
 /* Messages panel */
 .messages-panel{flex:1;display:flex;flex-direction:column;min-width:0}
 .messages-header{background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:10px 16px;font-weight:600;font-size:0.95em;flex-shrink:0;display:flex;align-items:center;gap:8px}
 .messages-list{flex:1;overflow-y:auto;padding:4px 0}
-.load-more-btn{display:block;margin:8px auto;padding:4px 16px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.8em}
+.load-more-btn{display:block;margin:8px auto;padding:4px 16px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.8em;min-height:44px}
 .load-more-btn:hover{color:var(--text);border-color:var(--text-muted)}
 
-.msg{padding:2px 16px 2px 16px}
+/* Date separator */
+.date-separator{display:flex;align-items:center;gap:12px;padding:12px 16px 4px;font-size:0.75em;color:var(--text-muted)}
+.date-separator::before,.date-separator::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.msg{padding:8px 16px;display:flex;gap:10px;align-items:flex-start}
 .msg:hover{background:var(--bg-secondary)}
-.msg.msg-grouped{padding-top:0}
-.msg-header{display:flex;align-items:baseline;gap:8px;margin-top:6px}
+.msg.msg-grouped{padding-top:2px}
+.msg.msg-own{border-left:2px solid var(--accent)}
+.msg-content{flex:1;min-width:0}
+.msg-header{display:flex;align-items:baseline;gap:8px;margin-top:2px}
 .msg-sender{color:var(--accent);font-weight:600;font-size:0.87em}
-.msg-sender.is-you{color:var(--yellow)}
 .msg-time{color:var(--text-muted);font-size:0.72em;cursor:default}
+.msg-time:hover{color:var(--text-secondary)}
 .msg-ch-tag{color:var(--text-secondary);font-size:0.72em;background:var(--bg-tertiary);padding:1px 6px;border-radius:4px}
 .msg-body{font-size:0.87em;line-height:1.45;word-break:break-word;padding-left:0;margin-top:1px;color:var(--text)}
 .msg-body code{background:var(--code-bg);padding:1px 5px;border-radius:3px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:0.92em}
 .msg-body pre{background:var(--code-bg);padding:10px 12px;border-radius:6px;overflow-x:auto;margin:4px 0;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:0.88em;line-height:1.4;white-space:pre-wrap}
 .msg-body pre code{background:none;padding:0;font-size:1em}
 .empty{color:var(--text-muted);text-align:center;padding:40px;font-size:0.9em}
+
+/* Avatar spacer for grouped messages (keeps body aligned) */
+.msg-avatar-spacer{width:32px;flex-shrink:0}
+
+/* Message slide-up animation */
+@keyframes msg-slide-up{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.msg-animate{animation:msg-slide-up 0.3s ease-out}
 
 /* First message fade-in animation */
 @keyframes msg-fade-in{
@@ -89,27 +118,40 @@ a:hover{text-decoration:underline}
 .msg-first-animate{animation:msg-fade-in 0.5s ease-out}
 
 /* Compose */
-.compose{background:var(--bg-secondary);border-top:1px solid var(--border);padding:12px 16px;flex-shrink:0}
+.compose{backdrop-filter:blur(8px);background:rgba(22,27,34,0.85);border-top:1px solid var(--border);padding:12px 16px;flex-shrink:0}
+.compose-channel-label{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:0.78em;color:var(--text-secondary);cursor:pointer;position:relative;padding:2px 0}
+.compose-channel-label:hover{color:var(--text)}
+.compose-channel-label .ch-label-text{font-weight:600;color:var(--text-muted)}
+.compose-channel-label .ch-label-arrow{font-size:0.7em;margin-left:2px}
+/* Channel dropdown */
+.compose-ch-dropdown{position:absolute;bottom:calc(100% + 4px);left:0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:4px;min-width:180px;max-height:200px;overflow-y:auto;z-index:300;box-shadow:0 4px 16px rgba(0,0,0,0.4);display:none}
+.compose-ch-dropdown.open{display:block}
+.compose-ch-dropdown-item{padding:6px 10px;border-radius:4px;font-size:0.85em;cursor:pointer;color:var(--text-secondary);min-height:36px;display:flex;align-items:center}
+.compose-ch-dropdown-item:hover{background:var(--bg-tertiary);color:var(--text)}
+.compose-ch-dropdown-item.active{color:var(--accent);font-weight:600}
+
 .compose-row{display:flex;gap:8px;align-items:flex-end}
-.compose-channel{background:var(--bg);color:var(--text-secondary);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.85em;font-family:inherit;width:140px;flex-shrink:0}
-.compose-channel:focus{outline:none;border-color:var(--accent)}
-.compose-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:0.9em;font-family:inherit;resize:none;min-height:40px;max-height:120px}
+.compose-input{flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:0.9em;font-family:inherit;resize:none;min-height:44px;max-height:120px}
 .compose-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(88,166,255,0.15)}
-.compose-send-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;align-self:flex-end}
-.compose-send{background:var(--green);color:#fff;border:none;border-radius:6px;padding:9px 20px;font-weight:600;cursor:pointer;font-size:0.87em;white-space:nowrap}
+.compose-send{background:var(--green);color:#fff;border:none;border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:1.1em;display:flex;align-items:center;justify-content:center;flex-shrink:0;min-height:44px;min-width:44px}
 .compose-send:hover{opacity:0.9}
 .compose-send:disabled{opacity:0.5;cursor:not-allowed}
-.compose-hint{color:var(--text-muted);font-size:0.65em;white-space:nowrap}
+.compose-send svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* Login */
-.login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000}
-.login-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:32px;max-width:420px;width:90%}
-.login-card h1{color:var(--accent);font-size:1.3em;margin-bottom:4px}
-.login-card .sub{color:var(--text-secondary);font-size:0.85em;margin-bottom:20px}
-.login-card input{width:100%;padding:10px 14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:0.9em;margin-bottom:12px}
-.login-card input:focus{outline:none;border-color:var(--accent)}
-.login-card button{width:100%;padding:10px;background:#238636;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:0.95em}
-.login-card button:hover{background:#2ea043}
+.login-overlay{position:fixed;inset:0;background:rgba(13,17,23,0.9);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;z-index:1000}
+.login-card{background:rgba(22,27,34,0.85);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:16px;padding:40px;max-width:440px;width:90%;text-align:center}
+.login-logo{margin-bottom:16px}
+.login-logo svg{width:56px;height:56px}
+.login-card h1{color:var(--accent);font-size:1.5em;margin-bottom:6px}
+.login-card .sub{color:var(--text-secondary);font-size:0.88em;margin-bottom:24px}
+.login-card input[type="password"]{width:100%;padding:12px 16px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:0.9em;margin-bottom:12px;min-height:44px}
+.login-card input[type="password"]:focus{outline:none;border-color:var(--accent)}
+.login-card .remember-row{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:0.85em;color:var(--text-secondary);justify-content:flex-start}
+.login-card .remember-row input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.login-card .remember-row label{cursor:pointer}
+.login-card button[type="submit"]{width:100%;padding:12px;background:#238636;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.95em;min-height:44px}
+.login-card button[type="submit"]:hover{background:#2ea043}
 .login-error{color:var(--red);font-size:0.83em;margin-top:8px}
 
 /* Onboarding */
@@ -130,19 +172,19 @@ a:hover{text-decoration:underline}
 .onboarding hr{border:none;border-top:1px solid var(--border);margin:20px 0}
 
 /* Create channel modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:500}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:500}
 .modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:24px;width:340px;max-width:90%}
 .modal h3{color:var(--text);margin-bottom:12px;font-size:1em}
 .modal input{width:100%;padding:8px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9em;margin-bottom:12px}
 .modal input:focus{outline:none;border-color:var(--accent)}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end}
-.modal-actions button{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:0.87em;font-weight:500}
+.modal-actions button{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:0.87em;font-weight:500;min-height:44px}
 .modal-actions .cancel{background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
 .modal-actions .confirm{background:var(--green);color:#fff}
 
 /* Tooltip */
 .tooltip{position:relative}
-.tooltip .tt-text{visibility:hidden;background:var(--bg-tertiary);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:0.78em;position:absolute;z-index:200;white-space:pre-wrap;max-width:280px;bottom:calc(100% + 6px);left:0;pointer-events:none;line-height:1.4}
+.tooltip .tt-text{visibility:hidden;background:var(--bg-tertiary);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:0.78em;position:absolute;z-index:200;white-space:pre-wrap;max-width:280px;bottom:calc(100% + 6px);left:0;pointer-events:none;line-height:1.4;box-shadow:0 4px 12px rgba(0,0,0,0.4)}
 .tooltip:hover .tt-text{visibility:visible}
 
 /* Mobile */
@@ -152,7 +194,6 @@ a:hover{text-decoration:underline}
   .sidebar.open{left:0}
   .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:199}
   .sidebar-backdrop.open{display:block}
-  .compose-channel{width:100px}
   .onboarding{padding:16px}
   .onboarding-card{padding:20px 16px}
 }
@@ -163,10 +204,23 @@ a:hover{text-decoration:underline}
 <!-- Login overlay -->
 <div class="login-overlay" id="login-overlay">
   <div class="login-card">
+    <div class="login-logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <rect rx="18" width="100" height="70" y="8" fill="#58a6ff" opacity="0.9"/>
+        <polygon points="28,78 48,78 33,96" fill="#58a6ff" opacity="0.9"/>
+        <circle cx="30" cy="38" r="6" fill="#0d1117"/>
+        <circle cx="50" cy="38" r="6" fill="#0d1117"/>
+        <circle cx="70" cy="38" r="6" fill="#0d1117"/>
+      </svg>
+    </div>
     <h1>Agentic Chat</h1>
     <p class="sub">Paste your relay token to connect.</p>
     <form id="login-form">
-      <input type="password" id="token-input" placeholder="relay_tok_..." autocomplete="off">
+      <input type="password" id="token-input" placeholder="relay_tok_...">
+      <div class="remember-row">
+        <input type="checkbox" id="remember-me" checked>
+        <label for="remember-me">Remember me</label>
+      </div>
       <button type="submit">Sign in</button>
     </form>
     <div class="login-error" id="login-error"></div>
@@ -209,14 +263,16 @@ a:hover{text-decoration:underline}
         <div class="empty">Loading...</div>
       </div>
       <div class="compose" id="compose-bar">
+        <div class="compose-channel-label" id="compose-channel-label">
+          <span class="ch-label-text" id="compose-ch-label-text">#general</span>
+          <span class="ch-label-arrow">&#9662;</span>
+          <div class="compose-ch-dropdown" id="compose-ch-dropdown"></div>
+        </div>
         <div class="compose-row">
-          <input class="compose-channel" id="compose-ch" placeholder="general" list="ch-datalist">
-          <datalist id="ch-datalist"></datalist>
-          <textarea class="compose-input" id="compose-msg" placeholder="Type a message..." rows="1"></textarea>
-          <div class="compose-send-wrap">
-            <button class="compose-send" id="compose-send">Send</button>
-            <span class="compose-hint">Enter to send</span>
-          </div>
+          <textarea class="compose-input" id="compose-msg" placeholder="Message #general..." rows="1"></textarea>
+          <button class="compose-send" id="compose-send" title="Send message">
+            <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -239,25 +295,34 @@ a:hover{text-decoration:underline}
 (function(){
 "use strict";
 
+// ---- Avatar colors ----
+var AVATAR_COLORS = ['#e06c75','#98c379','#e5c07b','#61afef','#c678dd','#56b6c2','#be5046','#d19a66','#7ec699','#cc99cd'];
+function avatarColor(name) {
+  var h = 0;
+  for (var i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
 // ---- State ----
-let token = sessionStorage.getItem('relay_token');
-let currentChannel = null; // null = all
-let myName = '';
-let myNamespace = '';
-let knownMsgIds = new Set();
-let lastSeenPerChannel = {}; // channel -> maxId (client-side tracking)
-let allMessages = [];
-let allChannels = [];
-let allPeers = [];
-let connected = true;
-let lastSuccessTime = Date.now();
-let refreshTimer = null;
-let notifPermission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
-let audioCtx = null;
-let oldestMsgId = Infinity;
-let isLoadingMore = false;
-let hasOnboarded = false;
-let previousMessageCount = 0;
+var token = localStorage.getItem('relay_token') || sessionStorage.getItem('relay_token');
+var currentChannel = null; // null = all
+var myName = '';
+var myNamespace = '';
+var knownMsgIds = new Set();
+var lastSeenPerChannel = {}; // channel -> maxId (client-side tracking)
+var allMessages = [];
+var allChannels = [];
+var allPeers = [];
+var connected = true;
+var lastSuccessTime = Date.now();
+var refreshTimer = null;
+var notifPermission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
+var audioCtx = null;
+var oldestMsgId = Infinity;
+var isLoadingMore = false;
+var hasOnboarded = false;
+var previousMessageCount = 0;
+var renderedMsgIds = new Set(); // track which messages have been rendered for animation
 
 // ---- Util ----
 function esc(s) {
@@ -275,6 +340,23 @@ function timeAgo(iso) {
   if (s < 3600) return Math.floor(s/60) + 'm ago';
   if (s < 86400) return Math.floor(s/3600) + 'h ago';
   return Math.floor(s/86400) + 'd ago';
+}
+
+function formatDateSeparator(dateStr) {
+  var d = new Date(dateStr);
+  var now = new Date();
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var diff = (today - msgDay) / 86400000;
+  if (diff < 1 && diff >= 0) return 'Today';
+  if (diff >= 1 && diff < 2) return 'Yesterday';
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return months[d.getMonth()] + ' ' + d.getDate();
+}
+
+function dayKey(iso) {
+  var d = new Date(iso);
+  return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
 }
 
 // ---- Sound (Web Audio API) ----
@@ -415,6 +497,13 @@ function buildPeerItem(p) {
   if (p.peer_name === myName) div.className += ' is-you';
   div.setAttribute('data-peer', p.peer_name);
 
+  // Avatar
+  var avatar = document.createElement('span');
+  avatar.className = 'peer-avatar';
+  avatar.style.background = avatarColor(p.peer_name);
+  avatar.textContent = p.peer_name.charAt(0);
+  div.appendChild(avatar);
+
   var dot = document.createElement('span');
   dot.className = 'dot ' + (p.status === 'online' ? 'online' : 'offline');
 
@@ -510,13 +599,36 @@ function renderChannels() {
     el.appendChild(div);
   });
 
-  // Update datalist for compose
-  var dl = document.getElementById('ch-datalist');
-  dl.innerHTML = '';
-  sorted.forEach(function(c) {
-    var opt = document.createElement('option');
-    opt.value = c.name;
-    dl.appendChild(opt);
+  // Update compose channel label and dropdown
+  updateComposeChannelLabel();
+  buildComposeDropdown(sorted);
+}
+
+// ---- Compose channel label & dropdown ----
+function getActiveChannelName() {
+  return currentChannel || 'general';
+}
+
+function updateComposeChannelLabel() {
+  var labelText = document.getElementById('compose-ch-label-text');
+  var chName = getActiveChannelName();
+  labelText.textContent = '#' + chName;
+  var msgInput = document.getElementById('compose-msg');
+  msgInput.placeholder = 'Message #' + chName + '...';
+}
+
+function buildComposeDropdown(sorted) {
+  var dd = document.getElementById('compose-ch-dropdown');
+  dd.innerHTML = '';
+  // "All" / general option
+  var channels = sorted || allChannels;
+  channels.forEach(function(c) {
+    var item = document.createElement('div');
+    item.className = 'compose-ch-dropdown-item';
+    if (currentChannel === c.name) item.className += ' active';
+    item.setAttribute('data-channel', c.name);
+    item.textContent = '#' + c.name;
+    dd.appendChild(item);
   });
 }
 
@@ -562,29 +674,60 @@ function renderMessages(scrollToBottom) {
     el.appendChild(loadBtn);
   }
 
+  var lastDay = null;
+
   // Group consecutive messages from same sender within 2 min
   for (var i = 0; i < filtered.length; i++) {
     var m = filtered[i];
     var prev = i > 0 ? filtered[i-1] : null;
+
+    // Date separator
+    var thisDay = dayKey(m.timestamp);
+    if (thisDay !== lastDay) {
+      var sep = document.createElement('div');
+      sep.className = 'date-separator';
+      sep.textContent = formatDateSeparator(m.timestamp);
+      el.appendChild(sep);
+      lastDay = thisDay;
+    }
+
     var grouped = prev && prev.sender === m.sender && prev.channel === m.channel;
     if (grouped) {
       var timeDiff = new Date(m.timestamp).getTime() - new Date(prev.timestamp).getTime();
       if (timeDiff > 120000) grouped = false;
+      // Don't group across day boundaries
+      if (dayKey(prev.timestamp) !== thisDay) grouped = false;
     }
+
+    var isOwn = m.sender === myName;
+    var isNew = !renderedMsgIds.has(m.id);
 
     var msgDiv = document.createElement('div');
-    msgDiv.className = 'msg' + (grouped ? ' msg-grouped' : '');
+    msgDiv.className = 'msg' + (grouped ? ' msg-grouped' : '') + (isOwn ? ' msg-own' : '');
     if (isFirstMessage && i === 0) {
       msgDiv.className += ' msg-first-animate';
+    } else if (isNew && allMessages.length > 1) {
+      msgDiv.className += ' msg-animate';
     }
     msgDiv.setAttribute('data-msg-id', m.id);
+    renderedMsgIds.add(m.id);
 
     if (!grouped) {
+      // Avatar
+      var avatar = document.createElement('span');
+      avatar.className = 'msg-avatar';
+      avatar.style.background = avatarColor(m.sender);
+      avatar.textContent = m.sender.charAt(0);
+      msgDiv.appendChild(avatar);
+
+      var contentWrap = document.createElement('div');
+      contentWrap.className = 'msg-content';
+
       var hdr = document.createElement('div');
       hdr.className = 'msg-header';
 
       var sender = document.createElement('span');
-      sender.className = 'msg-sender' + (m.sender === myName ? ' is-you' : '');
+      sender.className = 'msg-sender';
       sender.textContent = m.sender;
       hdr.appendChild(sender);
 
@@ -601,13 +744,30 @@ function renderMessages(scrollToBottom) {
       timeSpan.title = m.timestamp;
       hdr.appendChild(timeSpan);
 
-      msgDiv.appendChild(hdr);
-    }
+      contentWrap.appendChild(hdr);
 
-    var body = document.createElement('div');
-    body.className = 'msg-body';
-    body.innerHTML = formatContent(m.content);
-    msgDiv.appendChild(body);
+      var body = document.createElement('div');
+      body.className = 'msg-body';
+      body.innerHTML = formatContent(m.content);
+      contentWrap.appendChild(body);
+
+      msgDiv.appendChild(contentWrap);
+    } else {
+      // Spacer for avatar column
+      var spacer = document.createElement('span');
+      spacer.className = 'msg-avatar-spacer';
+      msgDiv.appendChild(spacer);
+
+      var contentWrap2 = document.createElement('div');
+      contentWrap2.className = 'msg-content';
+
+      var body2 = document.createElement('div');
+      body2.className = 'msg-body';
+      body2.innerHTML = formatContent(m.content);
+      contentWrap2.appendChild(body2);
+
+      msgDiv.appendChild(contentWrap2);
+    }
 
     el.appendChild(msgDiv);
   }
@@ -616,12 +776,15 @@ function renderMessages(scrollToBottom) {
   if (atBottom) {
     el.scrollTop = el.scrollHeight;
   }
+
+  // Update compose label
+  updateComposeChannelLabel();
 }
 
 function showOnboarding(container) {
   hasOnboarded = true;
   var relayUrl = window.location.origin + '/mcp';
-  var storedToken = sessionStorage.getItem('relay_token') || 'YOUR_TOKEN';
+  var storedToken = localStorage.getItem('relay_token') || sessionStorage.getItem('relay_token') || 'YOUR_TOKEN';
   container.innerHTML = '';
   var ob = document.createElement('div');
   ob.className = 'onboarding';
@@ -852,13 +1015,19 @@ document.getElementById('login-form').addEventListener('submit', async function(
   var t = document.getElementById('token-input').value.trim();
   if (!t) return;
   token = t;
-  sessionStorage.setItem('relay_token', t);
+  var rememberMe = document.getElementById('remember-me').checked;
+  if (rememberMe) {
+    localStorage.setItem('relay_token', t);
+  } else {
+    sessionStorage.setItem('relay_token', t);
+  }
   // Reset state
   knownMsgIds = new Set();
   allMessages = [];
   oldestMsgId = Infinity;
   hasOnboarded = false;
   previousMessageCount = 0;
+  renderedMsgIds = new Set();
 
   var ok = await refresh(true);
   if (ok) {
@@ -871,12 +1040,14 @@ document.getElementById('login-form').addEventListener('submit', async function(
 
 document.getElementById('sign-out-btn').addEventListener('click', function() {
   token = null;
+  localStorage.removeItem('relay_token');
   sessionStorage.removeItem('relay_token');
   knownMsgIds = new Set();
   allMessages = [];
   allPeers = [];
   allChannels = [];
   previousMessageCount = 0;
+  renderedMsgIds = new Set();
   showLogin();
 });
 
@@ -891,8 +1062,13 @@ document.getElementById('channels-list').addEventListener('click', function(e) {
   updateTitle();
   renderChannels();
   renderMessages(true);
-  // Update compose channel
-  document.getElementById('compose-ch').value = currentChannel || '';
+  // Flash animation
+  var activeItem = document.querySelector('.channel-item.active');
+  if (activeItem) {
+    activeItem.classList.remove('ch-flash');
+    void activeItem.offsetWidth; // force reflow
+    activeItem.classList.add('ch-flash');
+  }
   closeSidebar();
 });
 
@@ -905,12 +1081,36 @@ document.getElementById('peers-list').addEventListener('click', function(e) {
   var names = [myName.toLowerCase(), peer.toLowerCase()].sort();
   var dmChannel = 'dm-' + names[0] + '-' + names[1];
   currentChannel = dmChannel;
-  document.getElementById('compose-ch').value = dmChannel;
   computeClientUnread();
   updateTitle();
   renderChannels();
   renderMessages(true);
   closeSidebar();
+});
+
+// ---- Compose channel dropdown ----
+document.getElementById('compose-channel-label').addEventListener('click', function(e) {
+  e.stopPropagation();
+  var dd = document.getElementById('compose-ch-dropdown');
+  dd.classList.toggle('open');
+});
+
+document.getElementById('compose-ch-dropdown').addEventListener('click', function(e) {
+  var item = e.target.closest('.compose-ch-dropdown-item');
+  if (!item) return;
+  var ch = item.getAttribute('data-channel');
+  currentChannel = ch || null;
+  if (currentChannel) markChannelRead(currentChannel);
+  computeClientUnread();
+  updateTitle();
+  renderChannels();
+  renderMessages(true);
+  document.getElementById('compose-ch-dropdown').classList.remove('open');
+});
+
+// Close dropdown when clicking elsewhere
+document.addEventListener('click', function() {
+  document.getElementById('compose-ch-dropdown').classList.remove('open');
 });
 
 // ---- Load more history ----
@@ -940,11 +1140,9 @@ document.getElementById('messages-list').addEventListener('click', async functio
 
 // ---- Send message ----
 async function doSend() {
-  var chInput = document.getElementById('compose-ch');
+  var ch = getActiveChannelName();
   var msgInput = document.getElementById('compose-msg');
-  var ch = chInput.value.trim().replace(/^#/, '');
   var content = msgInput.value.trim();
-  if (!ch) ch = currentChannel || 'general';
   if (!content) return;
 
   var btn = document.getElementById('compose-send');
@@ -998,7 +1196,6 @@ document.getElementById('modal-ch-confirm').addEventListener('click', async func
   var result = await sendMessage(name, 'Channel created');
   if (result && result.ok) {
     currentChannel = name;
-    document.getElementById('compose-ch').value = name;
     await refresh();
     renderMessages(true);
   }

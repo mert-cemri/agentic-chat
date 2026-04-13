@@ -835,7 +835,7 @@ function showOnboarding(container) {
   step1.appendChild(s1p);
   var cmdBlock = document.createElement('div');
   cmdBlock.className = 'cmd-block';
-  var cmdText = 'claude mcp add --transport http --header "Authorization: Bearer ' + storedToken + '" -- relay ' + relayUrl;
+  var cmdText = 'claude mcp add -t http -s user -H "Authorization: Bearer ' + storedToken + '" -- relay ' + relayUrl;
   cmdBlock.textContent = cmdText;
   var copyBtn = document.createElement('button');
   copyBtn.className = 'copy-btn';

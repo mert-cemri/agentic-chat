@@ -58,8 +58,8 @@ async def join_page(request: Request) -> Response:
     # the parser to stop eating values for --header and treat the rest as
     # positional arguments.
     mcp_command = (
-        f'claude mcp add --transport http '
-        f'--header "Authorization: Bearer {token}" '
+        f'claude mcp add --transport http --scope user '
+        f'-H "Authorization: Bearer {token}" '
         f"-- relay {relay_url}"
     )
 
@@ -358,7 +358,7 @@ async def dashboard_api_invite(request: Request) -> JSONResponse:
     join_link = f"{base_url}/join/{raw_token}"
     relay_url = f"{base_url}/mcp"
     mcp_command = (
-        f'claude mcp add --transport http '
+        f'claude mcp add --transport http --scope user '
         f'-H "Authorization: Bearer {raw_token}" '
         f"-- relay {relay_url}"
     )
@@ -397,7 +397,7 @@ async def dashboard_api_me(request: Request) -> JSONResponse:
 
     mcp_url = f"{relay_url}/mcp"
     mcp_command = (
-        f'claude mcp add --transport http '
+        f'claude mcp add --transport http --scope user '
         f'-H "Authorization: Bearer {raw_token}" '
         f"-- relay {mcp_url}"
     )

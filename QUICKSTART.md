@@ -75,11 +75,11 @@ https://your-tunnel.trycloudflare.com/join/relay_tok_xxxxx...
 **Copy**, paste into a terminal:
 
 ```bash
-claude mcp add --transport http --header "Authorization: Bearer relay_tok_xxxxx..." -- relay https://your-tunnel.trycloudflare.com/mcp
+claude mcp add -t http -s user -H "Authorization: Bearer relay_tok_xxxxx..." -- relay https://your-tunnel.trycloudflare.com/mcp
 ```
 
-The `--` is required (the `--header` flag is variadic and otherwise eats the
-positional `relay` argument).
+`-s user` makes it global — works in every Claude Code session on that
+machine, regardless of directory. Run once per machine, not per session.
 
 Verify the connection:
 

@@ -113,11 +113,11 @@ def cmd_token_create(args: argparse.Namespace) -> None:
     if relay_url:
         mcp_url = f"{relay_url.rstrip('/')}/mcp"
         join_link = f"{relay_url.rstrip('/')}/join/{raw_token}"
-        print(f"\n  claude mcp add -t http -H \"Authorization: Bearer {raw_token}\" -- relay {mcp_url}")
+        print(f"\n  claude mcp add -t http -s user -H \"Authorization: Bearer {raw_token}\" -- relay {mcp_url}")
         print(f"\n  Or send them this join link (they open it, copy one command):")
         print(f"  {join_link}")
     else:
-        print(f"\n  claude mcp add -t http -H \"Authorization: Bearer {raw_token}\" -- relay https://YOUR_HOST/mcp")
+        print(f"\n  claude mcp add -t http -s user -H \"Authorization: Bearer {raw_token}\" -- relay https://YOUR_HOST/mcp")
         print(f"\n  Tip: use --url to generate a clickable join link:")
         print(f"  python relay.py token create --name {name} --url https://your-relay.example.com")
 
@@ -398,12 +398,12 @@ def _print_demo_box(base_url: str, tokens: dict[str, str], port: int) -> None:
 
     # Each person gets ONE token. Use it on every machine and session.
     cmd1 = (
-        f'claude mcp add --transport http '
+        f'claude mcp add --transport http --scope user '
         f'-H "Authorization: Bearer {tokens["user1"]}" '
         f'-- relay {mcp_url}'
     )
     cmd2 = (
-        f'claude mcp add --transport http '
+        f'claude mcp add --transport http --scope user '
         f'-H "Authorization: Bearer {tokens["user2"]}" '
         f'-- relay {mcp_url}'
     )

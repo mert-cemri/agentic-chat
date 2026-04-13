@@ -49,33 +49,25 @@ Claude Code stores MCP config per-user by default, so two sessions on the same
 machine will overwrite each other unless you use **project scope** in separate
 directories.
 
-**Terminal A (alice):**
+**Alice (run once on her machine — works in every Claude Code session after):**
 
 ```bash
-mkdir -p ~/sessionA && cd ~/sessionA
-
-claude mcp add --transport http --scope project \
-  --header "Authorization: Bearer relay_tok_ALICE_TOKEN_HERE" \
+claude mcp add -t http -s user \
+  -H "Authorization: Bearer relay_tok_ALICE_TOKEN_HERE" \
   -- relay http://localhost:4444/mcp
-
-claude
 ```
 
-**Terminal B (bob):**
+**Bob (same — one command, all sessions):**
 
 ```bash
-mkdir -p ~/sessionB && cd ~/sessionB
-
-claude mcp add --transport http --scope project \
-  --header "Authorization: Bearer relay_tok_BOB_TOKEN_HERE" \
+claude mcp add -t http -s user \
+  -H "Authorization: Bearer relay_tok_BOB_TOKEN_HERE" \
   -- relay http://localhost:4444/mcp
-
-claude
 ```
 
-The `--` before `relay` separates the `-H` flag from the positional server
-name. The `--scope project` writes the config to `./.mcp.json` in the current
-directory so each terminal has its own identity.
+The `--scope user` (`-s user`) stores the config globally so every Claude
+Code session on that machine has relay access — no per-directory setup.
+One token per person, use it everywhere.
 
 ### 3. Talk
 
@@ -203,20 +195,20 @@ They open the join link in a browser. The page shows their peer name and a
 into their terminal:
 
 ```bash
-claude mcp add --transport http \
-  --header "Authorization: Bearer relay_tok_f82k1m..." \
+claude mcp add -t http -s user \
+  -H "Authorization: Bearer relay_tok_f82k1m..." \
   -- relay https://abc123.ngrok-free.app/mcp
 ```
 
-Then they start Claude Code:
+Then start Claude Code (any directory, any terminal):
 
 ```bash
 claude
 ```
 
-And tell it:
+And just say:
 
-> call the heartbeat tool on the relay MCP server
+> any messages?
 
 Claude reports that they're connected as `shubham`. Now you and your friend
 can exchange messages.
@@ -306,12 +298,12 @@ what's on each end.
 
 | Problem | Fix |
 |---|---|
-| `MCP server relay already exists in local config` | `claude mcp remove relay` first, or use `--scope project` in a different directory |
-| `error: missing required argument 'name'` | Put `--` before the positional args: `... -- relay http://...` |
-| Claude doesn't understand "session 2" | Say "call the heartbeat tool on the relay MCP server" instead |
-| `/mcp` shows relay as "failed" | Check `curl http://localhost:4444/health`. If the relay isn't reachable, the whole session is broken |
-| Messages from the other session aren't appearing | Tell Claude "check the relay for new messages" — it doesn't poll automatically |
-| Rate-limited (429) | The token bucket allows 30-burst, 5/s sustained. If you're hitting it, you're sending faster than a human could |
+| `MCP server relay already exists` | `claude mcp remove relay` first, then re-add with `-s user` |
+| `error: missing required argument 'name'` | Add `--` before `relay`: `... -- relay http://...` |
+| Relay only works in one directory | You used the default scope. Re-add with `-s user` for global access |
+| Claude doesn't know about the relay | Say "any messages?" or "check the relay" — not "call the heartbeat tool" |
+| `/mcp` shows relay as "failed" | Check `curl http://localhost:4444/health` |
+| Messages not appearing | Claude doesn't poll — say "any new messages?" to check |
 
 ---
 

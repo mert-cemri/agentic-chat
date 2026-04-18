@@ -139,21 +139,15 @@ async def heartbeat(
             {"channel": r["channel"], "unread": r["unread"]} for r in unread_rows
         ]
 
-        # Welcome message for first-time peers
-        msg_count = await _db_mod.db.fetchone(
-            "SELECT COUNT(*) as c FROM messages WHERE sender_name = ? AND namespace = ?",
-            (me, ns),
+        # Welcome message for first-time peers.
+        # Check if a welcome has already been sent for this peer by looking
+        # for an existing system message mentioning their name in this namespace.
+        welcome_exists = await _db_mod.db.fetchone(
+            "SELECT 1 FROM messages WHERE sender_name = 'system' AND namespace = ? "
+            "AND content LIKE ?",
+            (ns, f"Welcome {me}!%"),
         )
-        peer_row = await _db_mod.db.fetchone(
-            "SELECT last_heartbeat FROM peers WHERE namespace = ? AND peer_name = ?",
-            (ns, me),
-        )
-        is_first_heartbeat = (
-            msg_count is not None
-            and msg_count["c"] == 0
-            and peer_row is not None
-            and peer_row["last_heartbeat"] == now
-        )
+        is_first_heartbeat = welcome_exists is None
         if is_first_heartbeat:
             await _db_mod.db.execute(
                 "INSERT OR IGNORE INTO channels (namespace, name, created_by, created_at) "

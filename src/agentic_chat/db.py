@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS messages (
     message_id INTEGER PRIMARY KEY AUTOINCREMENT,
     channel_id INTEGER NOT NULL,
     sender_name TEXT NOT NULL,
+    sender_display_name TEXT,
     namespace TEXT NOT NULL,
     content TEXT NOT NULL CHECK(length(content) > 0),
     created_at INTEGER NOT NULL,
@@ -84,6 +85,15 @@ class RelayDB:
         await self._db.commit()
         await self._db.execute("UPDATE peers SET status = 'offline'")
         await self._db.commit()
+        # Migration: add sender_display_name if missing (existing DBs)
+        try:
+            await self._db.execute(
+                "ALTER TABLE messages ADD COLUMN sender_display_name TEXT"
+            )
+            await self._db.commit()
+            log.info("Migrated: added sender_display_name column")
+        except Exception:
+            pass  # column already exists
         log.info("Database connected: %s", db_path)
 
     async def execute(self, sql: str, params: tuple = ()) -> aiosqlite.Cursor:

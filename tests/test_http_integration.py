@@ -138,7 +138,7 @@ async def test_send_receive_http_flow(seeded_db, mcp_client):
     assert len(recv_result["messages"]) == 1
     assert recv_result["messages"][0]["content"] == "Hello bob, testing over HTTP"
     assert recv_result["messages"][0]["id"] == msg_id
-    assert recv_result["messages"][0]["from"] == "alice"
+    assert recv_result["messages"][0]["from_peer"] == "alice"
 
     # Bob receives again -> empty (cursor advanced)
     recv2 = await bob.call_tool("receive", {"channel": "dm-alice-bob"})

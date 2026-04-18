@@ -165,7 +165,7 @@ async def dashboard_api(request: Request) -> JSONResponse:
     # Messages: support before_id for pagination
     if before_id is not None:
         messages = await _db_mod.db.fetchall(
-            "SELECT m.message_id, m.sender_name, m.content, m.created_at, "
+            "SELECT m.message_id, m.sender_name, m.sender_display_name, m.content, m.created_at, "
             "c.name AS channel_name, m.namespace "
             "FROM messages m "
             "JOIN channels c ON c.channel_id = m.channel_id "
@@ -175,7 +175,7 @@ async def dashboard_api(request: Request) -> JSONResponse:
         )
     else:
         messages = await _db_mod.db.fetchall(
-            "SELECT m.message_id, m.sender_name, m.content, m.created_at, "
+            "SELECT m.message_id, m.sender_name, m.sender_display_name, m.content, m.created_at, "
             "c.name AS channel_name, m.namespace "
             "FROM messages m "
             "JOIN channels c ON c.channel_id = m.channel_id "
@@ -187,7 +187,8 @@ async def dashboard_api(request: Request) -> JSONResponse:
     msg_list = [
         {
             "id": m["message_id"],
-            "sender": m["sender_name"],
+            "sender": m["sender_display_name"] or m["sender_name"],
+            "sender_peer": m["sender_name"],
             "channel": m["channel_name"],
             "namespace": m["namespace"],
             "content": m["content"],
@@ -278,11 +279,14 @@ async def dashboard_api_send(request: Request) -> JSONResponse:
             status_code=500,
         )
 
+    # display_name comes from the request body (set by dashboard UI or API caller)
+    display_name = body.get("display_name") or me
+
     now = now_ms()
     cursor = await _db_mod.db.execute(
-        "INSERT INTO messages (channel_id, sender_name, namespace, content, created_at) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (ch["channel_id"], me, ns, content, now),
+        "INSERT INTO messages (channel_id, sender_name, sender_display_name, namespace, content, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (ch["channel_id"], me, display_name, ns, content, now),
     )
     message_id = cursor.lastrowid
 

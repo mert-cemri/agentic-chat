@@ -216,6 +216,7 @@ a:hover{text-decoration:underline}
     <h1>Agentic Chat</h1>
     <p class="sub">Paste your relay token to connect.</p>
     <form id="login-form">
+      <input type="text" id="display-name-input" placeholder="Your name (e.g. Mert)" autocomplete="name" style="margin-bottom:8px;">
       <input type="password" id="token-input" placeholder="relay_tok_...">
       <div class="remember-row">
         <input type="checkbox" id="remember-me" checked>
@@ -305,6 +306,12 @@ function avatarColor(name) {
 
 // ---- State ----
 var token = localStorage.getItem('relay_token') || sessionStorage.getItem('relay_token');
+// Pre-fill display name from previous session
+(function() {
+  var savedName = localStorage.getItem('relay_display_name');
+  var nameInput = document.getElementById('display-name-input');
+  if (savedName && nameInput) nameInput.value = savedName;
+})();
 var currentChannel = null; // null = all
 var myName = '';
 var myNamespace = '';
@@ -426,10 +433,13 @@ async function fetchDashboardData() {
 
 async function sendMessage(channel, content) {
   try {
+    var displayName = localStorage.getItem('relay_display_name') || undefined;
+    var body = { channel: channel, content: content };
+    if (displayName) body.display_name = displayName;
     var resp = await fetch('/dashboard/api/send', {
       method: 'POST',
       headers: apiHeaders(),
-      body: JSON.stringify({ channel: channel, content: content })
+      body: JSON.stringify(body)
     });
     return await resp.json();
   } catch(e) {
@@ -1015,6 +1025,10 @@ document.getElementById('login-form').addEventListener('submit', async function(
   var t = document.getElementById('token-input').value.trim();
   if (!t) return;
   token = t;
+  var dn = document.getElementById('display-name-input').value.trim();
+  if (dn) {
+    localStorage.setItem('relay_display_name', dn);
+  }
   var rememberMe = document.getElementById('remember-me').checked;
   if (rememberMe) {
     localStorage.setItem('relay_token', t);

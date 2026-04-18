@@ -173,6 +173,7 @@ async def heartbeat(
 async def send(
     channel: str,
     content: str,
+    display_name: str | None = None,
     ctx: Context = None,  # type: ignore[assignment]
 ) -> dict:
     """Send a message to a channel or DM on the relay. The channel is auto-created if it does not exist yet.
@@ -259,10 +260,12 @@ async def send(
             }
 
         now = now_ms()
+        # display_name defaults to "{peer_name} (claude)" for agent sessions
+        effective_display = display_name or f"{me} (claude)"
         cursor = await _db_mod.db.execute(
-            "INSERT INTO messages (channel_id, sender_name, namespace, content, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (ch["channel_id"], me, ns, content, now),
+            "INSERT INTO messages (channel_id, sender_name, sender_display_name, namespace, content, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (ch["channel_id"], me, effective_display, ns, content, now),
         )
         message_id = cursor.lastrowid
 
@@ -362,7 +365,7 @@ async def receive(
 
         if channel is None:
             rows = await _db_mod.db.fetchall(
-                """SELECT m.message_id, m.sender_name, m.content, m.created_at,
+                """SELECT m.message_id, m.sender_name, m.sender_display_name, m.content, m.created_at,
                           c.name AS channel_name, m.channel_id
                    FROM messages m
                    JOIN channels c ON c.channel_id = m.channel_id
@@ -397,7 +400,8 @@ async def receive(
                     {
                         "id": r["message_id"],
                         "channel": r["channel_name"],
-                        "from": r["sender_name"],
+                        "from": r["sender_display_name"] or r["sender_name"],
+                        "from_peer": r["sender_name"],
                         "content": r["content"],
                         "timestamp": ms_to_iso(r["created_at"]),
                     }
@@ -460,7 +464,7 @@ async def receive(
             start_cursor = cursor_row["last_read_id"] if cursor_row else 0
 
         rows = await _db_mod.db.fetchall(
-            """SELECT message_id, sender_name, content, created_at
+            """SELECT message_id, sender_name, sender_display_name, content, created_at
                FROM messages
                WHERE channel_id = ? AND namespace = ? AND message_id > ?
                ORDER BY message_id ASC
@@ -487,7 +491,8 @@ async def receive(
             messages.append(
                 {
                     "id": r["message_id"],
-                    "from": r["sender_name"],
+                    "from": r["sender_display_name"] or r["sender_name"],
+                    "from_peer": r["sender_name"],
                     "content": r["content"],
                     "timestamp": ms_to_iso(r["created_at"]),
                 }

@@ -110,7 +110,7 @@ async def test_cannot_read_other_namespace_messages(test_db, mcp_client):
     assert r["ok"] is True
     assert len(r["messages"]) == 1
     assert r["messages"][0]["content"] == "team-a secret"
-    assert r["messages"][0]["from"] == "alice"
+    assert r["messages"][0]["from_peer"] == "alice"
 
     # Mallory reads -- should only see team-b content
     r = await mallory.call_tool("receive", {"channel": "secrets"})
@@ -429,7 +429,7 @@ async def test_can_send_to_dm_as_non_participant(test_db, mcp_client):
     # Alice can read it
     r = await alice.call_tool("receive", {"channel": "dm-alice-bob"})
     assert r["ok"] is True
-    assert r["messages"][0]["from"] == "carol"
+    assert r["messages"][0]["from_peer"] == "carol"
 
 
 # ------------------------------------------------------------------

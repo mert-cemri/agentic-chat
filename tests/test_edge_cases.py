@@ -280,7 +280,7 @@ async def test_peer_sends_to_own_channel_and_reads(test_db, mcp_client):
     r = await client.call_tool("receive", {"channel": "notes"})
     assert r["ok"] is True
     assert r["count"] == 2
-    assert r["messages"][0]["from"] == "alice"
+    assert r["messages"][0]["from_peer"] == "alice"
 
 
 # ------------------------------------------------------------------
@@ -410,4 +410,4 @@ async def test_dashboard_api_reflects_new_messages(test_db, mcp_client, http_cli
     data = resp.json()
     assert len(data["messages"]) == 1
     assert data["messages"][0]["content"] == "hello dashboard"
-    assert data["messages"][0]["sender"] == "alice"
+    assert data["messages"][0]["sender_peer"] == "alice"

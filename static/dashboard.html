@@ -1065,11 +1065,16 @@ document.getElementById('token-form').addEventListener('submit', async function(
       headers: { 'Authorization': 'Bearer ' + t }
     });
     var sessions = new Set();
+    var sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
     if (dataResp.ok) {
       var data = await dataResp.json();
       (data.messages || []).forEach(function(m) {
         if (m.sender_peer === meData.peer_name && m.sender) {
-          sessions.add(m.sender);
+          // Only show sessions active in the last 7 days
+          var msgTime = new Date(m.timestamp).getTime();
+          if (msgTime > sevenDaysAgo) {
+            sessions.add(m.sender);
+          }
         }
       });
     }
@@ -1142,6 +1147,7 @@ document.getElementById('name-form').addEventListener('submit', async function(e
 document.getElementById('sign-out-btn').addEventListener('click', function() {
   token = null;
   localStorage.removeItem('relay_token');
+  localStorage.removeItem('relay_display_name');
   sessionStorage.removeItem('relay_token');
   knownMsgIds = new Set();
   allMessages = [];
@@ -1325,12 +1331,35 @@ document.getElementById('sidebar-backdrop').addEventListener('click', closeSideb
 
 // ---- Boot ----
 (async function() {
-  if (token) {
+  var savedName = localStorage.getItem('relay_display_name');
+  if (token && savedName) {
+    // Both token and display name saved — skip login, go straight in
     var ok = await refresh(true);
     if (ok) {
       showApp();
       refreshTimer = setInterval(refresh, 3000);
     } else {
+      showLogin('Session expired. Please sign in again.');
+    }
+  } else if (token && !savedName) {
+    // Token saved but no display name — show step 2 (name selection)
+    try {
+      var resp = await fetch('/dashboard/api/me', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (resp.ok) {
+        var meData = await resp.json();
+        document.getElementById('login-peer-name').textContent = meData.peer_name + ' (' + meData.namespace + ')';
+        document.getElementById('display-name-input').placeholder = meData.peer_name;
+        document.getElementById('active-sessions-list').innerHTML =
+          '<div style="color:#484f58;">Enter a name for this session to continue.</div>';
+        document.getElementById('login-overlay').style.display = 'flex';
+        document.getElementById('login-step-1').style.display = 'none';
+        document.getElementById('login-step-2').style.display = 'block';
+      } else {
+        showLogin('Token expired. Please sign in again.');
+      }
+    } catch(e) {
       showLogin();
     }
   } else {

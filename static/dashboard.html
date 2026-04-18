@@ -214,16 +214,33 @@ a:hover{text-decoration:underline}
       </svg>
     </div>
     <h1>Agentic Chat</h1>
-    <p class="sub">Paste your relay token to connect.</p>
-    <form id="login-form">
-      <input type="text" id="display-name-input" placeholder="Your name (e.g. Mert)" autocomplete="name" style="margin-bottom:8px;">
-      <input type="password" id="token-input" placeholder="relay_tok_...">
-      <div class="remember-row">
-        <input type="checkbox" id="remember-me" checked>
-        <label for="remember-me">Remember me</label>
+
+    <!-- Step 1: Token -->
+    <div id="login-step-1">
+      <p class="sub">Paste your relay token to connect.</p>
+      <form id="token-form">
+        <input type="password" id="token-input" placeholder="relay_tok_...">
+        <div class="remember-row">
+          <input type="checkbox" id="remember-me" checked>
+          <label for="remember-me">Remember me</label>
+        </div>
+        <button type="submit">Connect</button>
+      </form>
+    </div>
+
+    <!-- Step 2: Name (shown after token validates) -->
+    <div id="login-step-2" style="display:none;">
+      <p class="sub">Connected as <strong id="login-peer-name" style="color:#58a6ff;"></strong></p>
+      <div id="active-sessions-box" style="margin:12px 0;padding:10px;background:#0d1117;border-radius:8px;border:1px solid #30363d;">
+        <div style="font-size:0.75em;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Active sessions</div>
+        <div id="active-sessions-list" style="font-size:0.85em;color:#e6edf3;"></div>
       </div>
-      <button type="submit">Sign in</button>
-    </form>
+      <form id="name-form">
+        <input type="text" id="display-name-input" placeholder="Name this session (e.g. Mert, mert-laptop-claude)" autocomplete="name">
+        <button type="submit">Join</button>
+      </form>
+    </div>
+
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -1010,6 +1027,8 @@ async function refresh(force) {
 function showLogin(err) {
   document.getElementById('login-overlay').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
+  document.getElementById('login-step-1').style.display = 'block';
+  document.getElementById('login-step-2').style.display = 'none';
   document.getElementById('login-error').textContent = err || '';
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
 }
@@ -1020,21 +1039,89 @@ function showApp() {
   requestNotifPermission();
 }
 
-document.getElementById('login-form').addEventListener('submit', async function(e) {
+// Step 1: validate token, show sessions
+document.getElementById('token-form').addEventListener('submit', async function(e) {
   e.preventDefault();
   var t = document.getElementById('token-input').value.trim();
   if (!t) return;
-  token = t;
-  var dn = document.getElementById('display-name-input').value.trim();
-  if (dn) {
-    localStorage.setItem('relay_display_name', dn);
+
+  // Validate token by calling /dashboard/api/me
+  try {
+    var resp = await fetch('/dashboard/api/me', {
+      headers: { 'Authorization': 'Bearer ' + t }
+    });
+    if (resp.status !== 200) {
+      document.getElementById('login-error').textContent = 'Invalid token. Check and try again.';
+      return;
+    }
+    var meData = await resp.json();
+
+    // Token is valid — store it temporarily
+    token = t;
+    document.getElementById('login-peer-name').textContent = meData.peer_name + ' (' + meData.namespace + ')';
+
+    // Fetch recent messages to find active session names
+    var dataResp = await fetch('/dashboard/api', {
+      headers: { 'Authorization': 'Bearer ' + t }
+    });
+    var sessions = new Set();
+    if (dataResp.ok) {
+      var data = await dataResp.json();
+      (data.messages || []).forEach(function(m) {
+        if (m.sender_peer === meData.peer_name && m.sender) {
+          sessions.add(m.sender);
+        }
+      });
+    }
+
+    // Show active sessions
+    var listEl = document.getElementById('active-sessions-list');
+    if (sessions.size > 0) {
+      listEl.innerHTML = Array.from(sessions).map(function(s) {
+        return '<div style="padding:3px 0;">&#x2022; ' + esc(s) + '</div>';
+      }).join('');
+    } else {
+      listEl.innerHTML = '<div style="color:#484f58;">No active sessions yet — you\'ll be the first!</div>';
+    }
+
+    // Pre-fill display name
+    var savedName = localStorage.getItem('relay_display_name');
+    var nameInput = document.getElementById('display-name-input');
+    if (savedName) {
+      nameInput.value = savedName;
+    } else {
+      nameInput.value = '';
+      nameInput.placeholder = meData.peer_name;
+    }
+
+    // Show step 2
+    document.getElementById('login-step-1').style.display = 'none';
+    document.getElementById('login-step-2').style.display = 'block';
+    document.getElementById('login-error').textContent = '';
+    nameInput.focus();
+
+  } catch(err) {
+    document.getElementById('login-error').textContent = 'Could not reach relay. Is it running?';
   }
+});
+
+// Step 2: set display name and enter
+document.getElementById('name-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var dn = document.getElementById('display-name-input').value.trim();
+  if (!dn) {
+    // Fall back to peer name from step 1
+    dn = document.getElementById('login-peer-name').textContent.split(' (')[0];
+  }
+  localStorage.setItem('relay_display_name', dn);
+
   var rememberMe = document.getElementById('remember-me').checked;
   if (rememberMe) {
-    localStorage.setItem('relay_token', t);
+    localStorage.setItem('relay_token', token);
   } else {
-    sessionStorage.setItem('relay_token', t);
+    sessionStorage.setItem('relay_token', token);
   }
+
   // Reset state
   knownMsgIds = new Set();
   allMessages = [];

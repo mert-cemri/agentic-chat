@@ -139,6 +139,58 @@ async def heartbeat(
             {"channel": r["channel"], "unread": r["unread"]} for r in unread_rows
         ]
 
+        # Welcome message for first-time peers
+        msg_count = await _db_mod.db.fetchone(
+            "SELECT COUNT(*) as c FROM messages WHERE sender_name = ? AND namespace = ?",
+            (me, ns),
+        )
+        peer_row = await _db_mod.db.fetchone(
+            "SELECT last_heartbeat FROM peers WHERE namespace = ? AND peer_name = ?",
+            (ns, me),
+        )
+        is_first_heartbeat = (
+            msg_count is not None
+            and msg_count["c"] == 0
+            and peer_row is not None
+            and peer_row["last_heartbeat"] == now
+        )
+        if is_first_heartbeat:
+            await _db_mod.db.execute(
+                "INSERT OR IGNORE INTO channels (namespace, name, created_by, created_at) "
+                "VALUES (?, 'general', ?, ?)",
+                (ns, me, now),
+            )
+            welcome_ch = await _db_mod.db.fetchone(
+                "SELECT channel_id FROM channels WHERE namespace = ? AND name = 'general'",
+                (ns,),
+            )
+            if welcome_ch:
+                public_url = CONFIG.get("public_url")
+                dashboard_line = (
+                    f"\nThe dashboard is at {public_url}/dashboard"
+                    if public_url
+                    else ""
+                )
+                await _db_mod.db.execute(
+                    "INSERT INTO messages (channel_id, sender_name, sender_display_name, "
+                    "namespace, content, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        welcome_ch["channel_id"],
+                        "system",
+                        "Relay Bot",
+                        ns,
+                        f"Welcome {me}! You're connected to the relay.\n\n"
+                        f"Try these:\n"
+                        f"- \"who's online?\" -- see other peers\n"
+                        f"- \"send hello to general\" -- broadcast a message\n"
+                        f"- \"tell alice I'm here\" -- send a DM\n"
+                        f"- \"check messages\" -- read your unreads"
+                        f"{dashboard_line}",
+                        now,
+                    ),
+                )
+                log.info("Sent welcome message for new peer %s/%s", ns, me)
+
         await maybe_cleanup()
 
         log.info(

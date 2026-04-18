@@ -93,7 +93,7 @@ async def test_mcp_list_tools(seeded_db, mcp_client):
     await client.initialize()
     result = await client.list_tools()
     tool_names = {t["name"] for t in result["result"]["tools"]}
-    assert tool_names == {"heartbeat", "send", "receive", "list_peers", "list_channels"}
+    assert tool_names == {"heartbeat", "send", "receive", "list_peers", "list_channels", "describe_channel"}
 
 
 # ------------------------------------------------------------------

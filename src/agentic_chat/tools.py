@@ -686,6 +686,7 @@ async def list_channels(
         rows = await _db_mod.db.fetchall(
             """SELECT
                 c.name,
+                c.description,
                 c.channel_id,
                 COUNT(m_all.message_id) AS total_messages,
                 COUNT(CASE WHEN m_all.message_id > COALESCE(cu.last_read_id, 0)
@@ -709,9 +710,12 @@ async def list_channels(
 
         channels = []
         for r in rows:
+            ch_name = r["name"]
             channels.append(
                 {
-                    "name": r["name"],
+                    "name": ch_name,
+                    "type": channel_type(ch_name),
+                    "description": r.get("description"),
                     "unread": r["unread"],
                     "total_messages": r["total_messages"],
                     "last_activity": (
@@ -735,6 +739,59 @@ async def list_channels(
             "error": "Internal server error.",
             "hint": "Try again in a moment.",
         }
+
+
+@mcp.tool()
+async def describe_channel(
+    channel: str,
+    description: str,
+    ctx: Context = None,  # type: ignore[assignment]
+) -> dict:
+    """Set or update a channel's description. Helps others understand what the channel is for.
+
+    WHEN TO CALL:
+    - "describe #backend as the backend engineering channel"
+    - "set the description of general to team announcements"
+    - "what is #frontend for?" — call list_channels to see existing descriptions
+
+    PARAMETERS:
+    - channel: the channel name
+    - description: a short description (max 200 chars)
+    """
+    caller = get_caller(ctx)
+    ns = caller["namespace"]
+
+    try:
+        if len(description) > 200:
+            return {"ok": False, "error": "Description max 200 characters.", "hint": "Keep it short."}
+
+        # Normalize the channel name
+        channel, ch_error = normalize_channel(channel, caller_name=caller["peer_name"])
+        if ch_error:
+            return {"ok": False, "error": ch_error}
+
+        ch = await _db_mod.db.fetchone(
+            "SELECT channel_id FROM channels WHERE namespace = ? AND name = ?",
+            (ns, channel),
+        )
+        if not ch:
+            return {
+                "ok": False,
+                "error": f"Channel '{channel}' does not exist.",
+                "hint": "Send a message to it first to create it, then set the description.",
+            }
+
+        await _db_mod.db.execute(
+            "UPDATE channels SET description = ? WHERE channel_id = ?",
+            (description, ch["channel_id"]),
+        )
+
+        log.info("Channel description set: %s/%s = %s", ns, channel, description[:50])
+        return {"ok": True, "channel": channel, "description": description}
+
+    except Exception:
+        log.exception("describe_channel error")
+        return {"ok": False, "error": "Internal server error.", "hint": "Try again."}
 
 
 # -- Health Endpoint -----------------------------------------------

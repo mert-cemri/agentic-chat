@@ -254,11 +254,11 @@ async def dashboard_api_send(request: Request) -> JSONResponse:
             status_code=400,
         )
 
-    # Normalize DM channel names
-    channel, dm_error = normalize_channel(channel)
-    if dm_error:
+    # Normalize channel names (DMs, groups, self)
+    channel, ch_error = normalize_channel(channel, caller_name=me)
+    if ch_error:
         return JSONResponse(
-            {"ok": False, "error": dm_error},
+            {"ok": False, "error": ch_error},
             status_code=400,
         )
 

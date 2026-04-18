@@ -135,15 +135,59 @@ def test_normalize_dm_empty_parts():
     assert err is not None
 
 
-def test_normalize_dm_three_parts():
-    """dm-a-b-c should error (too many parts)."""
+def test_normalize_dm_three_parts_suggests_group():
+    """dm-a-b-c should error and suggest group- prefix."""
     _, err = normalize_channel("dm-a-b-c")
     assert err is not None
+    assert "group-" in err  # should suggest using group channel
 
 
 def test_normalize_dm_one_part():
     """dm-alice (only one name) should error."""
     _, err = normalize_channel("dm-alice")
+    assert err is not None
+
+
+# -- Group channel tests --
+
+
+def test_normalize_group_sorts_and_dedupes():
+    """Group channel names should be sorted and deduplicated."""
+    assert normalize_channel("group-carol-bob-alice") == ("group-alice-bob-carol", None)
+    assert normalize_channel("group-bob-alice-bob") == ("group-alice-bob", None)  # dedup
+
+
+def test_normalize_group_lowercases():
+    """Group names should be lowercased."""
+    assert normalize_channel("Group-Alice-Bob-Carol") == ("group-alice-bob-carol", None)
+    assert normalize_channel("GROUP-ZAR-ALI") == ("group-ali-zar", None)
+
+
+def test_normalize_group_needs_2_plus():
+    """Group with fewer than 2 names should error."""
+    _, err = normalize_channel("group-alice")
+    assert err is not None
+    _, err = normalize_channel("group-")
+    assert err is not None
+
+
+# -- Self channel tests --
+
+
+def test_normalize_self_with_name():
+    """Self channel normalizes to lowercase."""
+    assert normalize_channel("self-Alice") == ("self-alice", None)
+    assert normalize_channel("SELF-MERT") == ("self-mert", None)
+
+
+def test_normalize_self_with_caller():
+    """Self channel without explicit name uses caller_name."""
+    assert normalize_channel("self-", caller_name="mert") == ("self-mert", None)
+
+
+def test_normalize_self_no_name_no_caller():
+    """Self channel without name or caller should error."""
+    _, err = normalize_channel("self-")
     assert err is not None
 
 

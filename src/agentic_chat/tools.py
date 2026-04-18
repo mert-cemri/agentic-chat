@@ -13,7 +13,7 @@ from .server import mcp
 from .auth import get_caller
 from .config import CONFIG, now_ms, ms_to_iso
 from . import db as _db_mod
-from .channels import CHANNEL_NAME_RE, is_dm_channel, normalize_channel
+from .channels import CHANNEL_NAME_RE, is_dm_channel, is_group_channel, is_self_channel, normalize_channel, channel_type
 from .cleanup import maybe_cleanup
 
 log = logging.getLogger("relay")
@@ -222,31 +222,27 @@ async def send(
     display_name: str | None = None,
     ctx: Context = None,  # type: ignore[assignment]
 ) -> dict:
-    """Send a message to a channel or DM on the relay. The channel is auto-created if it does not exist yet.
+    """Send a message to a channel on the relay. Channels are auto-created on first use.
 
-    WHEN TO CALL THIS TOOL:
-    - User says "tell X ...", "message X ...", "send X ...", "reply to X ..."
-    - User says "broadcast ...", "tell everyone ...", "announce ..."
-    - User says "respond to X with ..." or "let X know ..."
+    CHANNEL TYPES:
+    - Broadcast: channel="general" (or any name like "backend", "frontend") — everyone sees it
+    - DM (1-on-1): channel="dm-yourname-theirname" — server sorts names, so order doesn't matter
+    - Group DM: channel="group-alice-bob-carol" — for 3+ people, names sorted automatically
+    - Personal notes: channel="self-yourname" — only you see it (across all your sessions)
 
-    HOW TO CONSTRUCT THE CHANNEL NAME:
-    - For a DM to a specific person: channel="dm-yourname-theirname" (the server sorts the two names alphabetically, so the order you provide does not matter)
-    - For a broadcast to everyone: channel="general"
-    - For a topic channel: channel="some-topic-name" (alphanumeric and hyphens only, 1-64 chars)
-    - Your identity (the sender name) is determined automatically from your auth token -- you never need to ask the user who they are
-
-    WHAT IT RETURNS:
-    - ok: whether the message was sent successfully
-    - message_id: the ID of the sent message
-    - channel: the normalized channel name
-    - timestamp: when the message was created
+    WHEN TO CALL:
+    - "tell X ..." / "message X ..." → send(channel="dm-you-X", content="...")
+    - "broadcast ..." / "tell everyone ..." → send(channel="general", content="...")
+    - "message alice and bob about the deploy" → send(channel="group-alice-bob-you", content="...")
+    - "note to self: check the logs later" → send(channel="self-yourname", content="...")
 
     PARAMETERS:
-    - channel (required): the channel to send to -- see naming conventions above
-    - content (required): the message text to send (max 50000 chars)
+    - channel (required): channel name (see types above)
+    - content (required): message text (max 50000 chars)
+    - display_name (optional): how to show the sender (defaults to "{peer} (claude)")
 
     EXAMPLES:
-    - User says "tell alice I pushed the fix" -> call send(channel="dm-yourname-alice", content="I pushed the fix")
+    - User says "tell alice I pushed the fix" → send(channel="dm-yourname-alice", content="I pushed the fix")
     - User says "broadcast: standup in 5 minutes" -> call send(channel="general", content="standup in 5 minutes")
     - User says "reply to bob with sounds good" -> call send(channel="dm-yourname-bob", content="sounds good")
     - User says "tell everyone the deploy is done" -> call send(channel="general", content="the deploy is done")
@@ -278,13 +274,13 @@ async def send(
                 "hint": "Split into smaller messages.",
             }
 
-        # Normalize DM channel names (sort for deduplication, no access control)
-        channel, dm_error = normalize_channel(channel)
-        if dm_error:
+        # Normalize channel name (DMs sort names, groups sort+dedup, self auto-fills)
+        channel, ch_error = normalize_channel(channel, caller_name=me)
+        if ch_error:
             return {
                 "ok": False,
-                "error": dm_error,
-                "hint": "DM channels must have exactly two peer names: dm-name1-name2",
+                "error": ch_error,
+                "hint": "Channel formats: dm-name1-name2, group-name1-name2-name3, self-yourname, or any custom name",
             }
 
         # Auto-create channel
@@ -478,13 +474,14 @@ async def receive(
             }
 
         # -- Single channel mode --
-        if is_dm_channel(channel):
-            channel, dm_error = normalize_channel(channel)
-            if dm_error:
+        # Normalize DM/group/self channel names for consistent lookup
+        if is_dm_channel(channel) or is_group_channel(channel) or is_self_channel(channel):
+            channel, ch_error = normalize_channel(channel, caller_name=me)
+            if ch_error:
                 return {
                     "ok": False,
-                    "error": dm_error,
-                    "hint": "DM channels must have exactly two peer names: dm-name1-name2",
+                    "error": ch_error,
+                    "hint": "Channel formats: dm-name1-name2, group-name1-name2-name3, self-yourname",
                 }
 
         ch = await _db_mod.db.fetchone(

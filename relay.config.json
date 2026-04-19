@@ -9,5 +9,5 @@
   "max_receive_response_bytes": 102400,
   "rate_limit_burst": 30,
   "rate_limit_refill_per_sec": 5.0,
-  "public_url": null
+  "public_url": "https://35.203.160.188.nip.io"
 }

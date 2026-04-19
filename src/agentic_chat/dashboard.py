@@ -11,7 +11,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from .server import mcp
 from .config import CONFIG, now_ms, ms_to_iso
 from . import db as _db_mod
-from .channels import CHANNEL_NAME_RE, PEER_NAME_RE, normalize_channel
+from .channels import CHANNEL_NAME_RE, OWNER_NAME_RE, normalize_channel
 
 log = logging.getLogger("relay")
 
@@ -33,7 +33,7 @@ async def join_page(request: Request) -> Response:
 
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     row = await _db_mod.db.fetchone(
-        "SELECT peer_name, namespace FROM tokens WHERE token_hash = ?",
+        "SELECT owner_name, namespace FROM tokens WHERE token_hash = ?",
         (token_hash,),
     )
     if not row:
@@ -41,6 +41,8 @@ async def join_page(request: Request) -> Response:
             "<h1>Invalid or expired token</h1><p>Ask the relay operator for a new link.</p>",
             status_code=404,
         )
+
+    owner = row["owner_name"]
 
     # Build the relay URL. Prefer an explicit public_url from config
     # (safer — not vulnerable to Host header poisoning). Fall back to the
@@ -60,6 +62,7 @@ async def join_page(request: Request) -> Response:
     mcp_command = (
         f'claude mcp add --transport http --scope user '
         f'-H "Authorization: Bearer {token}" '
+        f'-H "X-Peer-Name: {owner}-laptop" '
         f"-- relay {relay_url}"
     )
 
@@ -72,7 +75,7 @@ async def join_page(request: Request) -> Response:
 
     html = _load_template("join.html").format(
         relay_name=row["namespace"],
-        peer_name=row["peer_name"],
+        owner_name=owner,
         mcp_command=mcp_command,
         dashboard_url=dashboard_url,
     )
@@ -89,7 +92,11 @@ async def dashboard(request: Request) -> Response:
 
 async def _authenticate_dashboard_request(request: Request) -> dict | None:
     """Authenticate a dashboard API request via Bearer token.
-    Returns the peer dict on success, None on failure."""
+
+    The dashboard acts as the token's *owner*, so the returned dict has
+    ``peer_name == owner_name`` (any messages sent from the dashboard are
+    attributed to the owner, not a session sub-identity).
+    """
     auth = request.headers.get("authorization", "")
     if not auth.startswith("Bearer "):
         return None
@@ -98,10 +105,16 @@ async def _authenticate_dashboard_request(request: Request) -> dict | None:
         return None
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     row = await _db_mod.db.fetchone(
-        "SELECT peer_name, namespace FROM tokens WHERE token_hash = ?",
+        "SELECT owner_name, namespace FROM tokens WHERE token_hash = ?",
         (token_hash,),
     )
-    return dict(row) if row else None
+    if not row:
+        return None
+    return {
+        "peer_name": row["owner_name"],
+        "owner_name": row["owner_name"],
+        "namespace": row["namespace"],
+    }
 
 
 @mcp.custom_route("/dashboard/api", methods=["GET"])
@@ -322,16 +335,25 @@ async def dashboard_api_invite(request: Request) -> JSONResponse:
             status_code=400,
         )
 
-    name = body.get("name", "").strip()
-    if not name:
+    # Accept `owner` (preferred) and `name` (legacy alias the built-in
+    # dashboard HTML may still post).
+    owner = (body.get("owner") or body.get("name") or "").strip()
+    if not owner:
         return JSONResponse(
-            {"ok": False, "error": "Peer name is required."},
+            {"ok": False, "error": "Owner name is required."},
             status_code=400,
         )
 
-    if not PEER_NAME_RE.match(name):
+    if not OWNER_NAME_RE.match(owner):
         return JSONResponse(
-            {"ok": False, "error": "Peer name must be 1-32 chars, starting with alphanumeric, then alphanumeric/underscore/hyphen."},
+            {
+                "ok": False,
+                "error": (
+                    "Owner name must be 1-31 chars, start with alphanumeric, "
+                    "then alphanumeric/underscore (no hyphens — hyphens are "
+                    "the session-suffix separator)."
+                ),
+            },
             status_code=400,
         )
 
@@ -342,9 +364,9 @@ async def dashboard_api_invite(request: Request) -> JSONResponse:
     # Insert into tokens table
     try:
         await _db_mod.db.execute(
-            "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+            "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
             "VALUES (?, ?, ?, ?)",
-            (token_hash, name, ns, now_ms()),
+            (token_hash, owner, ns, now_ms()),
         )
     except Exception:
         return JSONResponse(
@@ -364,14 +386,15 @@ async def dashboard_api_invite(request: Request) -> JSONResponse:
     mcp_command = (
         f'claude mcp add --transport http --scope user '
         f'-H "Authorization: Bearer {raw_token}" '
+        f'-H "X-Peer-Name: {owner}-laptop" '
         f"-- relay {relay_url}"
     )
 
-    log.info("Invite created: %s/%s by %s", ns, name, caller["peer_name"])
+    log.info("Invite created: %s/%s by %s", ns, owner, caller["owner_name"])
 
     return JSONResponse({
         "ok": True,
-        "peer_name": name,
+        "owner_name": owner,
         "token": raw_token,
         "join_link": join_link,
         "mcp_command": mcp_command,
@@ -399,15 +422,18 @@ async def dashboard_api_me(request: Request) -> JSONResponse:
     else:
         relay_url = f"{request.url.scheme}://{request.url.netloc}"
 
+    owner = caller["owner_name"]
     mcp_url = f"{relay_url}/mcp"
     mcp_command = (
         f'claude mcp add --transport http --scope user '
         f'-H "Authorization: Bearer {raw_token}" '
+        f'-H "X-Peer-Name: {owner}-laptop" '
         f"-- relay {mcp_url}"
     )
 
     return JSONResponse({
-        "peer_name": caller["peer_name"],
+        "owner_name": owner,
+        "peer_name": owner,
         "namespace": caller["namespace"],
         "relay_url": relay_url,
         "mcp_command": mcp_command,

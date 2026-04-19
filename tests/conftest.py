@@ -49,7 +49,7 @@ async def seeded_db(test_db):
         raw = f"relay_tok_test_{name}"
         h = hashlib.sha256(raw.encode()).hexdigest()
         await test_db.execute(
-            "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+            "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
             "VALUES (?, ?, 'default', ?)",
             (h, name, now_ms()),
         )

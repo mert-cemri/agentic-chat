@@ -14,7 +14,7 @@ PRAGMA busy_timeout = 5000;
 
 CREATE TABLE IF NOT EXISTS tokens (
     token_hash TEXT PRIMARY KEY,
-    peer_name TEXT NOT NULL,
+    owner_name TEXT NOT NULL,
     namespace TEXT NOT NULL DEFAULT 'default',
     created_at INTEGER NOT NULL,
     last_used_at INTEGER
@@ -98,6 +98,19 @@ class RelayDB:
                 log.info("Migrated: added %s.%s column", table, col)
             except Exception:
                 pass  # column already exists
+
+        # tokens.peer_name -> tokens.owner_name: reflects new model where
+        # a token identifies an owner (account), and the session picks its
+        # own peer_name via X-Peer-Name (must be owner or owner-<suffix>).
+        cursor = await self._db.execute("PRAGMA table_info(tokens)")
+        cols = {row[1] for row in await cursor.fetchall()}
+        if "peer_name" in cols and "owner_name" not in cols:
+            await self._db.execute(
+                "ALTER TABLE tokens RENAME COLUMN peer_name TO owner_name"
+            )
+            await self._db.commit()
+            log.info("Migrated: renamed tokens.peer_name -> tokens.owner_name")
+
         log.info("Database connected: %s", db_path)
 
     async def execute(self, sql: str, params: tuple = ()) -> aiosqlite.Cursor:

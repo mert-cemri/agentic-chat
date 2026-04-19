@@ -505,7 +505,7 @@ function renderPeers() {
   if (!allPeers.length || (!otherPeers.length && allPeers.length <= 1)) {
     var hint = document.createElement('div');
     hint.className = 'sidebar-empty-hint';
-    hint.textContent = 'Invite others to join the relay. Create tokens with: python relay.py token create --name theirname';
+    hint.textContent = 'Invite others to join the relay. Create tokens with: python relay.py token create --owner theirname';
     el.appendChild(hint);
     // Still show current user if present
     allPeers.forEach(function(p) {
@@ -889,7 +889,7 @@ function showOnboarding(container) {
   step2.appendChild(s2p);
   var cmd2 = document.createElement('div');
   cmd2.className = 'cmd-block';
-  var cmd2Text = 'python relay.py token create --name theirname --url ' + window.location.origin;
+  var cmd2Text = 'python relay.py token create --owner theirname --url ' + window.location.origin;
   cmd2.textContent = cmd2Text;
   var copy2 = document.createElement('button');
   copy2.className = 'copy-btn';

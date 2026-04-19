@@ -8,6 +8,41 @@ CHANNEL_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,63}$")
 # Peer names: alphanumeric + underscores + hyphens, 1-32 chars
 PEER_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$")
 
+# Owner names: alphanumeric + underscores only (no hyphens). Hyphens are
+# reserved as the separator between owner and session suffix — allowing
+# them in owners would let `alice-bob-laptop` be claimed by both owner
+# `alice` (as suffix `bob-laptop`) and owner `alice-bob` (as suffix `laptop`).
+OWNER_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_]{0,30}$")
+
+
+def validate_session_peer_name(peer_name: str, owner_name: str) -> str | None:
+    """Check that a session-declared peer_name is permitted for this owner.
+
+    Rule: peer_name must equal owner_name, OR start with ``{owner_name}-``
+    followed by a non-empty suffix of alphanumerics/underscores/hyphens.
+    The full peer_name must also match PEER_NAME_RE (bounds length + charset).
+
+    Returns None on success, or a human-readable error string on failure.
+    """
+    if not PEER_NAME_RE.match(peer_name):
+        return (
+            f"peer name {peer_name!r} is invalid: must be 1-32 chars, "
+            "start with alphanumeric, then alphanumerics/underscores/hyphens"
+        )
+    if peer_name == owner_name:
+        return None
+    prefix = owner_name + "-"
+    if not peer_name.startswith(prefix):
+        return (
+            f"peer name {peer_name!r} is not permitted for token owner "
+            f"{owner_name!r}: must be {owner_name!r} or start with "
+            f"{prefix!r}"
+        )
+    suffix = peer_name[len(prefix):]
+    if not suffix:
+        return f"peer name {peer_name!r} has empty suffix after {prefix!r}"
+    return None
+
 
 # -- Channel type detection --
 

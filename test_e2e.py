@@ -44,7 +44,7 @@ def section(title: str):
 
 # ── Helper: create a token directly in the DB ──────────────────
 
-def create_token(peer_name: str, namespace: str = "test_ns") -> str:
+def create_token(owner_name: str, namespace: str = "test_ns") -> str:
     """Create a token directly in the DB and return the raw token string."""
     raw_token = f"relay_tok_{secrets.token_urlsafe(32)}"
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
@@ -52,9 +52,9 @@ def create_token(peer_name: str, namespace: str = "test_ns") -> str:
 
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES (?, ?, ?, ?)",
-        (token_hash, peer_name, namespace, now_ms),
+        (token_hash, owner_name, namespace, now_ms),
     )
     conn.commit()
     conn.close()

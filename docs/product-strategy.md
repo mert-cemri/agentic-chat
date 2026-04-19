@@ -47,8 +47,8 @@ To get two agents talking on the same machine, the current steps are:
 1. `pip install -r requirements.txt`
 2. `python relay.py init`
 3. `python relay.py serve`
-4. `python relay.py token create --name alice`
-5. `python relay.py token create --name bob`
+4. `python relay.py token create --owner alice`
+5. `python relay.py token create --owner bob`
 6. `mkdir -p ~/sessionA && cd ~/sessionA`
 7. `claude mcp add --transport http --scope project --header "Authorization: Bearer ..." -- relay http://localhost:4444/mcp`
 8. `claude` (in terminal A)

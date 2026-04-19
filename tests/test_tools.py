@@ -366,7 +366,7 @@ async def test_namespace_isolation_peers(seeded_db):
 
     # alice in ns-a, dave in ns-b
     await db.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES ('dave_hash', 'dave', 'ns-b', ?)",
         (now_ms(),),
     )

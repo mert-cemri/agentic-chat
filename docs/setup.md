@@ -23,8 +23,8 @@ python relay.py serve       # starts on http://localhost:4444
 ### 2. Create tokens for each session
 
 ```bash
-python relay.py token create --name alice
-python relay.py token create --name bob
+python relay.py token create --owner alice
+python relay.py token create --owner bob
 ```
 
 Save the printed tokens.
@@ -78,7 +78,7 @@ ngrok prints a URL like `https://abc123.ngrok-free.app`. That's your relay URL.
 
 ```bash
 # Create a token with the join link
-python relay.py token create --name friend --url https://abc123.ngrok-free.app
+python relay.py token create --owner friend --url https://abc123.ngrok-free.app
 ```
 
 Send the printed link to your friend. They open it in a browser, copy one command, done.
@@ -119,8 +119,8 @@ pip3 install -r requirements.txt
 python3 relay.py init
 
 # Create tokens for everyone
-python3 relay.py token create --name mert --url https://relay.yourdomain.com
-python3 relay.py token create --name shubham --url https://relay.yourdomain.com
+python3 relay.py token create --owner mert --url https://relay.yourdomain.com
+python3 relay.py token create --owner shubham --url https://relay.yourdomain.com
 
 # Set up Caddy for automatic HTTPS
 sudo tee /etc/caddy/Caddyfile <<'EOF'
@@ -147,7 +147,7 @@ Point your domain's DNS A record to the VPS IP. Caddy handles TLS automatically.
 ### With `--url` (generates a clickable join link)
 
 ```bash
-python relay.py token create --name shubham --url https://relay.yourdomain.com
+python relay.py token create --owner shubham --url https://relay.yourdomain.com
 ```
 
 Output:
@@ -167,7 +167,7 @@ The friend:
 ### Without `--url` (manual)
 
 ```bash
-python relay.py token create --name shubham
+python relay.py token create --owner shubham
 ```
 
 Send them the `claude mcp add` command from the output. They paste it and they're connected.
@@ -179,6 +179,6 @@ Send them the `claude mcp add` command from the output. They paste it and they'r
 ```bash
 python relay.py token list                          # see all peers
 python relay.py token revoke --name shubham         # remove a peer
-python relay.py token create --name shubham         # re-add them
+python relay.py token create --owner shubham         # re-add them
 python relay.py check --url https://your-relay.com  # verify deployment
 ```

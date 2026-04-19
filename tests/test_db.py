@@ -41,7 +41,7 @@ async def test_startup_resets_peers_offline(tmp_path):
 
     # Insert a peer as online
     await db.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES (?, 'x', 'default', ?)",
         (hashlib.sha256(b"tok").hexdigest(), now_ms()),
     )
@@ -83,7 +83,7 @@ async def test_fetchone_returns_dict_or_none(test_db):
     assert result is None
 
     await test_db.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES ('abc', 'test', 'default', ?)",
         (now_ms(),),
     )
@@ -91,7 +91,7 @@ async def test_fetchone_returns_dict_or_none(test_db):
         "SELECT * FROM tokens WHERE token_hash = 'abc'"
     )
     assert result is not None
-    assert result["peer_name"] == "test"
+    assert result["owner_name"] == "test"
 
 
 @pytest.mark.asyncio
@@ -101,25 +101,25 @@ async def test_fetchall_returns_list(test_db):
     assert result == []
 
     await test_db.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES ('a', 'p1', 'default', ?)",
         (now_ms(),),
     )
     await test_db.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES ('b', 'p2', 'default', ?)",
         (now_ms(),),
     )
-    result = await test_db.fetchall("SELECT * FROM tokens ORDER BY peer_name")
+    result = await test_db.fetchall("SELECT * FROM tokens ORDER BY owner_name")
     assert len(result) == 2
-    assert result[0]["peer_name"] == "p1"
+    assert result[0]["owner_name"] == "p1"
 
 
 @pytest.mark.asyncio
 async def test_close_and_wal_checkpoint(test_db):
     """close() should checkpoint WAL and close connection."""
     await test_db.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES ('x', 'test', 'default', ?)",
         (now_ms(),),
     )

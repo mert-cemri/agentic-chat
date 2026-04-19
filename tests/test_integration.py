@@ -18,7 +18,7 @@ async def create_peer(db: RelayDB, name: str, ns: str = "default") -> str:
     raw = f"relay_tok_integ_{name}_{time.monotonic()}"
     h = hashlib.sha256(raw.encode()).hexdigest()
     await db.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES (?, ?, ?, ?)",
         (h, name, ns, now_ms()),
     )
@@ -270,7 +270,7 @@ async def test_token_revoke_and_recreate(test_db):
 
     # Revoke
     await db.execute(
-        "DELETE FROM tokens WHERE peer_name='alice' AND namespace='default'"
+        "DELETE FROM tokens WHERE owner_name='alice' AND namespace='default'"
     )
     await db.execute(
         "DELETE FROM cursors WHERE peer_name='alice' AND namespace='default'"
@@ -293,9 +293,9 @@ async def test_token_revoke_and_recreate(test_db):
     h2 = hashlib.sha256(raw2.encode()).hexdigest()
 
     row = await db.fetchone(
-        "SELECT peer_name FROM tokens WHERE token_hash=?", (h2,)
+        "SELECT owner_name FROM tokens WHERE token_hash=?", (h2,)
     )
-    assert row["peer_name"] == "alice"
+    assert row["owner_name"] == "alice"
 
 
 @pytest.mark.asyncio

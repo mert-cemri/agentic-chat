@@ -112,7 +112,7 @@ SVCEOF
   sleep 3
 
   # Create a token for the deployer
-  DEPLOYER_OUTPUT=$(/opt/agentic-chat/.venv/bin/python relay.py token create --name admin --url "http://'"$HOSTNAME"':4444" 2>&1)
+  DEPLOYER_OUTPUT=$(/opt/agentic-chat/.venv/bin/python relay.py token create --owner admin --url "http://'"$HOSTNAME"':4444" 2>&1)
   echo "$DEPLOYER_OUTPUT"
 
   echo ""
@@ -130,7 +130,7 @@ echo "  Health:     http://$EXTERNAL_IP:4444/health"
 echo ""
 echo "  To create tokens:"
 echo "  gcloud compute ssh $VM_NAME --zone=$ZONE -- \\"
-echo "    'cd /opt/agentic-chat && .venv/bin/python relay.py token create --name YOUR_NAME --url http://$EXTERNAL_IP:4444'"
+echo "    'cd /opt/agentic-chat && .venv/bin/python relay.py token create --owner YOUR_NAME --url http://$EXTERNAL_IP:4444'"
 echo ""
 echo "  To connect Claude Code (run once on your machine):"
 echo "  claude mcp add -t http -s user -H \"Authorization: Bearer YOUR_TOKEN\" -- relay http://$EXTERNAL_IP:4444/mcp"

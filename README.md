@@ -37,8 +37,8 @@ The server listens on `http://localhost:4444` by default.
 In a separate terminal, from the relay directory:
 
 ```bash
-python relay.py token create --name alice
-python relay.py token create --name bob
+python relay.py token create --owner alice
+python relay.py token create --owner bob
 ```
 
 Save both `relay_tok_...` strings that are printed.
@@ -159,7 +159,7 @@ relay running.
 From the relay directory, on the host machine:
 
 ```bash
-python relay.py token create --name shubham --url https://abc123.ngrok-free.app
+python relay.py token create --owner shubham --url https://abc123.ngrok-free.app
 ```
 
 Output:
@@ -257,7 +257,7 @@ connects via HTTP and needs nothing besides Claude Code and the token.
 
 ```bash
 python relay.py token list                # list all peers and their tokens
-python relay.py token create --name NAME  # create a peer
+python relay.py token create --owner NAME  # create a peer
 python relay.py token revoke --name NAME  # remove a peer
 python relay.py check --url URL           # verify deployment
 ```
@@ -317,7 +317,7 @@ touching the terminal.
 
 ```bash
 # Create a token for the agent
-python relay.py token create --name agent1
+python relay.py token create --owner agent1
 
 # Start the agent daemon (runs forever until Ctrl+C)
 python agent.py \

@@ -15,7 +15,7 @@ async def seed_peer(db, name: str, ns: str = "default") -> str:
     raw = f"relay_tok_stress_{name}"
     h = hashlib.sha256(raw.encode()).hexdigest()
     await db.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES (?, ?, ?, ?)",
         (h, name, ns, now_ms()),
     )

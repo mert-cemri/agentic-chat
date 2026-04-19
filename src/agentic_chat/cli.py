@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 from .config import DEFAULT_CONFIG, load_config, validate_config, now_ms, ms_to_iso
-from .channels import PEER_NAME_RE
+from .channels import OWNER_NAME_RE
 from .db import SCHEMA_SQL
 
 logging.basicConfig(
@@ -45,11 +45,11 @@ def cmd_init(args: argparse.Namespace) -> None:
         conn.executescript(SCHEMA_SQL)
         conn.execute("UPDATE peers SET status = 'offline'")
 
-        # Create operator's peer token
+        # Create operator's owner token
         raw_token = f"relay_tok_{secrets.token_urlsafe(32)}"
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         conn.execute(
-            "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+            "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
             "VALUES (?, ?, ?, ?)",
             (token_hash, "admin", namespace, now_ms()),
         )
@@ -61,26 +61,36 @@ def cmd_init(args: argparse.Namespace) -> None:
     print(f"Database created at: {config['db_path']}")
     print(f"\nYour token (SAVE THIS -- shown only once):")
     print(f"  {raw_token}")
+    print(f"  Owner: admin. Sessions may connect as 'admin' or 'admin-<suffix>'.")
     print(f"\nNote: All relay administration is via the CLI on this machine.")
-    print(f"\nTo create a peer token:")
-    print(f"  python relay.py token create --name shubham --namespace {namespace}")
+    print(f"\nTo create an owner token for someone else:")
+    print(f"  python relay.py token create --owner shubham --namespace {namespace}")
     print(f"\nTo start the server:")
     print(f"  python relay.py serve")
 
 
 def cmd_token_create(args: argparse.Namespace) -> None:
-    """Generate a new peer token."""
+    """Generate a new owner token.
+
+    One token per *person*; each session then picks its own peer_name via
+    the ``X-Peer-Name`` header (must equal the owner or start with
+    ``{owner}-``). So one human with three Claude Code sessions needs one
+    token, not three.
+    """
     import sqlite3
 
     config = load_config()
     conn = sqlite3.connect(config["db_path"])
 
-    name = args.name
+    owner = args.owner
     namespace = args.namespace
 
-    if not PEER_NAME_RE.match(name):
+    if not OWNER_NAME_RE.match(owner):
         print(
-            f"Error: peer name must match {PEER_NAME_RE.pattern}", file=sys.stderr
+            f"Error: owner name must match {OWNER_NAME_RE.pattern} "
+            "(alphanumeric + underscore, no hyphens; hyphens are the "
+            "session-suffix separator)",
+            file=sys.stderr,
         )
         sys.exit(1)
 
@@ -89,9 +99,9 @@ def cmd_token_create(args: argparse.Namespace) -> None:
 
     try:
         conn.execute(
-            "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+            "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
             "VALUES (?, ?, ?, ?)",
-            (token_hash, name, namespace, now_ms()),
+            (token_hash, owner, namespace, now_ms()),
         )
         conn.commit()
     except sqlite3.IntegrityError:
@@ -105,21 +115,37 @@ def cmd_token_create(args: argparse.Namespace) -> None:
 
     relay_url = args.url if hasattr(args, "url") and args.url else None
 
-    print(f"\nToken for '{name}':")
+    print(f"\nToken for owner '{owner}':")
     print(f"  {raw_token}")
-    print(f"\n  This is {name}'s identity. One token per person — use it on")
-    print(f"  every machine and every Claude Code session. Run once per machine:")
+    print(f"\n  One token, N sessions. Each session picks its own peer name")
+    print(f"  via the X-Peer-Name header — must be '{owner}' or start with")
+    print(f"  '{owner}-' (e.g. '{owner}-laptop', '{owner}-desktop').")
 
     if relay_url:
         mcp_url = f"{relay_url.rstrip('/')}/mcp"
         join_link = f"{relay_url.rstrip('/')}/join/{raw_token}"
-        print(f"\n  claude mcp add -t http -s user -H \"Authorization: Bearer {raw_token}\" -- relay {mcp_url}")
-        print(f"\n  Or send them this join link (they open it, copy one command):")
+        print(f"\n  Example — run this on each machine (edit the name):")
+        print(
+            f"  claude mcp add -t http -s user "
+            f'-H "Authorization: Bearer {raw_token}" '
+            f'-H "X-Peer-Name: {owner}-laptop" '
+            f"-- relay {mcp_url}"
+        )
+        print(f"\n  Or share this join link (shows a copy-paste command):")
         print(f"  {join_link}")
     else:
-        print(f"\n  claude mcp add -t http -s user -H \"Authorization: Bearer {raw_token}\" -- relay https://YOUR_HOST/mcp")
+        print(f"\n  Example — run this on each machine (edit the name):")
+        print(
+            f"  claude mcp add -t http -s user "
+            f'-H "Authorization: Bearer {raw_token}" '
+            f'-H "X-Peer-Name: {owner}-laptop" '
+            f"-- relay https://YOUR_HOST/mcp"
+        )
         print(f"\n  Tip: use --url to generate a clickable join link:")
-        print(f"  python relay.py token create --name {name} --url https://your-relay.example.com")
+        print(
+            f"  python relay.py token create --owner {owner} "
+            f"--url https://your-relay.example.com"
+        )
 
     print(f"\n  After setup, just say \"any messages?\" in Claude Code.")
 
@@ -133,8 +159,8 @@ def cmd_token_list(args: argparse.Namespace) -> None:
     conn.row_factory = sqlite3.Row
 
     rows = conn.execute(
-        "SELECT token_hash, peer_name, namespace, created_at, last_used_at "
-        "FROM tokens ORDER BY namespace, peer_name"
+        "SELECT token_hash, owner_name, namespace, created_at, last_used_at "
+        "FROM tokens ORDER BY namespace, owner_name"
     ).fetchall()
     conn.close()
 
@@ -143,7 +169,7 @@ def cmd_token_list(args: argparse.Namespace) -> None:
         return
 
     print(
-        f"{'Peer':<20} {'Namespace':<15} {'Created':<22} "
+        f"{'Owner':<20} {'Namespace':<15} {'Created':<22} "
         f"{'Last Used':<22} {'Hash (first 12)'}"
     )
     print("-" * 100)
@@ -151,45 +177,51 @@ def cmd_token_list(args: argparse.Namespace) -> None:
         created = ms_to_iso(r["created_at"]) if r["created_at"] else "never"
         used = ms_to_iso(r["last_used_at"]) if r["last_used_at"] else "never"
         print(
-            f"{r['peer_name']:<20} {r['namespace']:<15} {created:<22} "
+            f"{r['owner_name']:<20} {r['namespace']:<15} {created:<22} "
             f"{used:<22} {r['token_hash'][:12]}..."
         )
 
 
 def cmd_token_revoke(args: argparse.Namespace) -> None:
-    """Revoke a token by deleting its row. Also cleans up cursors."""
+    """Revoke a token by deleting its row.
+
+    Also cleans up cursors for the owner and any ``{owner}-*`` session
+    identities that were created under this token.
+    """
     import sqlite3
 
     config = load_config()
     conn = sqlite3.connect(config["db_path"])
 
-    name = args.name
+    owner = args.owner
     namespace = args.namespace
 
     deleted = conn.execute(
-        "DELETE FROM tokens WHERE peer_name = ? AND namespace = ?",
-        (name, namespace),
+        "DELETE FROM tokens WHERE owner_name = ? AND namespace = ?",
+        (owner, namespace),
     ).rowcount
 
     if deleted == 0:
         print(
-            f"No token found for '{name}' in namespace '{namespace}'.",
+            f"No token found for owner '{owner}' in namespace '{namespace}'.",
             file=sys.stderr,
         )
         conn.close()
         sys.exit(1)
 
+    # Cursors live under peer_name, which may be the owner or owner-<suffix>.
     conn.execute(
-        "DELETE FROM cursors WHERE peer_name = ? AND namespace = ?",
-        (name, namespace),
+        "DELETE FROM cursors WHERE namespace = ? AND "
+        "(peer_name = ? OR peer_name LIKE ?)",
+        (namespace, owner, f"{owner}-%"),
     )
     conn.commit()
     conn.close()
 
-    print(f"Token for '{name}' in namespace '{namespace}' has been revoked.")
-    print("Cursors cleaned up. The peer can no longer authenticate.")
-    print(f"\nTo re-create a token for this peer:")
-    print(f"  python relay.py token create --name {name} --namespace {namespace}")
+    print(f"Token for owner '{owner}' in namespace '{namespace}' has been revoked.")
+    print("Cursors for the owner and its sessions cleaned up.")
+    print(f"\nTo re-create a token for this owner:")
+    print(f"  python relay.py token create --owner {owner} --namespace {namespace}")
 
 
 def cmd_check(args: argparse.Namespace) -> None:
@@ -337,13 +369,13 @@ def cmd_demo(args: argparse.Namespace) -> None:
         conn.executescript(SCHEMA_SQL)
         conn.execute("UPDATE peers SET status = 'offline'")
 
-        # Create two demo tokens
+        # Create two demo owner tokens
         tokens = {}
         for name in ("user1", "user2"):
             raw_token = f"relay_tok_{secrets.token_urlsafe(32)}"
             token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
             conn.execute(
-                "INSERT OR REPLACE INTO tokens (token_hash, peer_name, namespace, created_at) "
+                "INSERT OR REPLACE INTO tokens (token_hash, owner_name, namespace, created_at) "
                 "VALUES (?, ?, ?, ?)",
                 (token_hash, name, "default", now_ms()),
             )
@@ -396,15 +428,17 @@ def _print_demo_box(base_url: str, tokens: dict[str, str], port: int) -> None:
     mcp_url = f"{base_url}/mcp"
     dashboard_url = f"{base_url}/dashboard"
 
-    # Each person gets ONE token. Use it on every machine and session.
+    # Each person gets ONE token. Each session picks its own peer name.
     cmd1 = (
         f'claude mcp add --transport http --scope user '
         f'-H "Authorization: Bearer {tokens["user1"]}" '
+        f'-H "X-Peer-Name: user1-laptop" '
         f'-- relay {mcp_url}'
     )
     cmd2 = (
         f'claude mcp add --transport http --scope user '
         f'-H "Authorization: Bearer {tokens["user2"]}" '
+        f'-H "X-Peer-Name: user2-laptop" '
         f'-- relay {mcp_url}'
     )
 
@@ -414,15 +448,16 @@ def _print_demo_box(base_url: str, tokens: dict[str, str], port: int) -> None:
         f"  Dashboard:  {dashboard_url}",
         f"  Login token: {tokens['user1']}",
         "",
-        "  -- Connect Claude Code (run once per machine) " + "-" * 10,
+        "  -- Connect Claude Code (edit X-Peer-Name per machine) " + "-" * 6,
         "",
-        f"  You (user1) — paste in any terminal:",
+        f"  You (owner=user1) — paste in any terminal:",
         f"  {cmd1}",
         "",
-        f"  A friend (user2) — send them this command:",
+        f"  A friend (owner=user2) — send them this command:",
         f"  {cmd2}",
         "",
-        "  One token = one person. Use it on all your sessions & machines.",
+        "  One token per human. Each session's X-Peer-Name must be the owner",
+        "  (e.g. 'user1') or start with the owner plus a dash ('user1-laptop').",
         '  Then just say: "any messages?" in Claude Code.',
         "",
     ]
@@ -561,8 +596,18 @@ def main() -> None:
     token_parser = subparsers.add_parser("token", help="Token management")
     token_sub = token_parser.add_subparsers(dest="token_command")
 
-    tc = token_sub.add_parser("create", help="Create a peer token")
-    tc.add_argument("--name", required=True, help="Peer name")
+    tc = token_sub.add_parser(
+        "create",
+        help="Create an owner token (sessions pick peer names via X-Peer-Name)",
+    )
+    tc.add_argument(
+        "--owner",
+        required=True,
+        help=(
+            "Owner name. Sessions using this token may identify as "
+            "OWNER or OWNER-<suffix> via the X-Peer-Name header."
+        ),
+    )
     tc.add_argument(
         "--namespace", default="default", help="Namespace (default: 'default')"
     )
@@ -572,8 +617,8 @@ def main() -> None:
 
     token_sub.add_parser("list", help="List all tokens")
 
-    tr = token_sub.add_parser("revoke", help="Revoke a peer token")
-    tr.add_argument("--name", required=True, help="Peer name")
+    tr = token_sub.add_parser("revoke", help="Revoke an owner token")
+    tr.add_argument("--owner", required=True, help="Owner name")
     tr.add_argument(
         "--namespace", default="default", help="Namespace (default: 'default')"
     )

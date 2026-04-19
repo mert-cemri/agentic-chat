@@ -8,9 +8,40 @@ from typing import Any
 from starlette.responses import JSONResponse
 
 from .config import CONFIG, now_ms
+from .channels import validate_session_peer_name
 from . import db as _db_mod
 
 log = logging.getLogger("relay")
+
+
+async def resolve_token(raw_token: str) -> dict | None:
+    """Look up a bearer token and return {owner_name, namespace} or None.
+
+    Shared between the ASGI middleware (MCP tool calls) and the dashboard
+    helpers so auth behaves identically across entry points.
+    """
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    row = await _db_mod.db.fetchone(
+        "SELECT owner_name, namespace FROM tokens WHERE token_hash = ?",
+        (token_hash,),
+    )
+    return dict(row) if row else None
+
+
+def resolve_peer_name(owner_name: str, declared: str | None) -> tuple[str, str | None]:
+    """Resolve the session's peer_name from the header (or default to owner).
+
+    Returns (peer_name, error). If ``declared`` is None/empty the peer_name
+    defaults to ``owner_name`` (back-compat for clients that don't send the
+    header). Otherwise the declared name must pass
+    :func:`validate_session_peer_name`.
+    """
+    if not declared:
+        return owner_name, None
+    err = validate_session_peer_name(declared, owner_name)
+    if err:
+        return declared, err
+    return declared, None
 
 
 class TokenBucket:
@@ -104,10 +135,7 @@ class TokenAuthMiddleware:
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
         # Authenticate FIRST (before rate limiting to prevent attacker-controlled dict growth)
-        row = await _db_mod.db.fetchone(
-            "SELECT peer_name, namespace FROM tokens WHERE token_hash = ?",
-            (token_hash,),
-        )
+        row = await resolve_token(raw_token)
 
         if not row:
             log.warning("Auth failed for token_hash=%s", token_hash[:12])
@@ -120,11 +148,34 @@ class TokenAuthMiddleware:
             )
             return await response(scope, receive, send)
 
+        owner_name = row["owner_name"]
+        namespace = row["namespace"]
+
+        # Session-time peer_name: X-Peer-Name header, or fall back to owner.
+        declared = headers.get(b"x-peer-name", b"").decode().strip() or None
+        peer_name, err = resolve_peer_name(owner_name, declared)
+        if err:
+            log.warning(
+                "Peer name rejected: owner=%s/%s declared=%r: %s",
+                namespace, owner_name, declared, err,
+            )
+            response = JSONResponse(
+                {
+                    "error": err,
+                    "hint": (
+                        "X-Peer-Name must equal the token's owner or start "
+                        f"with {owner_name + '-'!r}."
+                    ),
+                },
+                status_code=403,
+            )
+            return await response(scope, receive, send)
+
         # Token bucket rate limiting (post-auth to prevent attacker dict growth)
         now_mono = time.monotonic()
         bucket = self._get_bucket(token_hash, now_mono)
         if not bucket.try_consume(now_mono):
-            log.warning("Rate limited: %s/%s", row["namespace"], row["peer_name"])
+            log.warning("Rate limited: %s/%s", namespace, peer_name)
             response = JSONResponse(
                 {
                     "error": "Too many requests. Please slow down.",
@@ -144,13 +195,15 @@ class TokenAuthMiddleware:
                 k: b for k, b in self._buckets.items() if b.last_refill > cutoff
             }
 
-        # Inject peer identity into ASGI scope
+        # Inject peer identity into ASGI scope. Consumers read peer_name
+        # for attribution/cursors; owner_name is available for policy checks.
         scope["relay_peer"] = {
-            "peer_name": row["peer_name"],
-            "namespace": row["namespace"],
+            "peer_name": peer_name,
+            "namespace": namespace,
+            "owner_name": owner_name,
         }
 
-        log.debug("Authenticated: %s/%s", row["namespace"], row["peer_name"])
+        log.debug("Authenticated: %s/%s (owner=%s)", namespace, peer_name, owner_name)
 
         # Update last_used_at
         await _db_mod.db.execute(
@@ -167,8 +220,8 @@ class TokenAuthMiddleware:
                VALUES (?, ?, 'online', ?, ?, ?)
                ON CONFLICT(namespace, peer_name) DO NOTHING""",
             (
-                row["peer_name"],
-                row["namespace"],
+                peer_name,
+                namespace,
                 now_ms(),
                 time.monotonic(),
                 now_ms(),
@@ -186,4 +239,10 @@ def get_caller(ctx: "Context") -> dict:
         raise RuntimeError("No peer identity in scope -- auth middleware not applied")
 
 
-__all__ = ["TokenBucket", "TokenAuthMiddleware", "get_caller"]
+__all__ = [
+    "TokenBucket",
+    "TokenAuthMiddleware",
+    "get_caller",
+    "resolve_token",
+    "resolve_peer_name",
+]

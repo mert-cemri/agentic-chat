@@ -206,7 +206,7 @@ async def test_namespace_isolation_over_http(test_db, mcp_client):
         raw = f"relay_tok_{name}_{ns}"
         h = hashlib.sha256(raw.encode()).hexdigest()
         await test_db.execute(
-            "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+            "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
             "VALUES (?, ?, ?, ?)",
             (h, name, ns, now_ms()),
         )
@@ -300,7 +300,7 @@ async def test_dashboard_api_does_not_leak_other_namespaces(test_db, mcp_client,
         raw = f"relay_tok_dash_{name}_{ns}"
         h = hashlib.sha256(raw.encode()).hexdigest()
         await test_db.execute(
-            "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+            "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
             "VALUES (?, ?, ?, ?)",
             (h, name, ns, now_ms()),
         )

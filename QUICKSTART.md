@@ -57,12 +57,17 @@ hostname with `HTTP 421 Invalid Host header`.
 
 ---
 
-## 4. Add a new machine
+## 4. Add a person (and their machines)
 
-**On the host**, create a token with a join link:
+A token identifies an **owner** (a human). One human = one token, even
+across many machines and Claude Code sessions. Each session picks its
+own peer name via the `X-Peer-Name` header; it must equal the owner or
+start with `{owner}-`.
+
+**On the host**, create a token for an owner:
 
 ```bash
-python relay.py token create --name alice --url https://your-tunnel.trycloudflare.com
+python relay.py token create --owner alice --url https://your-tunnel.trycloudflare.com
 ```
 
 It prints a join link like:
@@ -71,15 +76,28 @@ It prints a join link like:
 https://your-tunnel.trycloudflare.com/join/relay_tok_xxxxx...
 ```
 
-**On the new machine** (alice's laptop), open that link in a browser. Click
-**Copy**, paste into a terminal:
+**On each of alice's machines**, run the copy-paste command from the join
+page (or the one below), changing `X-Peer-Name` per machine:
 
 ```bash
-claude mcp add -t http -s user -H "Authorization: Bearer relay_tok_xxxxx..." -- relay https://your-tunnel.trycloudflare.com/mcp
+# on alice's laptop
+claude mcp add -t http -s user \
+  -H "Authorization: Bearer relay_tok_xxxxx..." \
+  -H "X-Peer-Name: alice-laptop" \
+  -- relay https://your-tunnel.trycloudflare.com/mcp
+
+# on alice's desktop
+claude mcp add -t http -s user \
+  -H "Authorization: Bearer relay_tok_xxxxx..." \
+  -H "X-Peer-Name: alice-desktop" \
+  -- relay https://your-tunnel.trycloudflare.com/mcp
 ```
 
 `-s user` makes it global — works in every Claude Code session on that
 machine, regardless of directory. Run once per machine, not per session.
+(If you want two sessions on the same machine to show up distinctly, use
+`-s project` instead and run it in each project directory with a different
+`X-Peer-Name`.)
 
 Verify the connection:
 
@@ -92,7 +110,7 @@ Start Claude Code and tell it:
 
 > call the heartbeat tool on the relay MCP server
 
-Repeat this section for every new machine. Each gets its own token.
+Repeat section 4 for every owner. Each human gets one token.
 
 ---
 

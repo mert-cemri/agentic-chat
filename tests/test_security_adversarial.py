@@ -17,7 +17,7 @@ async def seed_peer(db, name: str, ns: str = "default") -> str:
     raw = f"relay_tok_sec_{name}_{ns}"
     h = hashlib.sha256(raw.encode()).hexdigest()
     await db.execute(
-        "INSERT INTO tokens (token_hash, peer_name, namespace, created_at) "
+        "INSERT INTO tokens (token_hash, owner_name, namespace, created_at) "
         "VALUES (?, ?, ?, ?)",
         (h, name, ns, now_ms()),
     )
@@ -293,9 +293,11 @@ async def test_token_bucket_refills_over_time(test_db, _live_app, http_client):
     """After the burst is exhausted, waiting should refill the bucket."""
     import agentic_chat.config as config_module
 
-    # Small bucket, fast refill so the test is quick
+    # Slow refill so the timing margin is robust. 1 token per 500ms means a
+    # dozen-ms HTTP roundtrip can't accidentally refill enough to satisfy a
+    # consume call. Sleep long enough afterwards to guarantee a full refill.
     config_module.CONFIG["rate_limit_burst"] = 2
-    config_module.CONFIG["rate_limit_refill_per_sec"] = 20.0  # 50ms per token
+    config_module.CONFIG["rate_limit_refill_per_sec"] = 2.0  # 500ms per token
     _live_app._buckets.clear()
 
     try:
@@ -323,8 +325,8 @@ async def test_token_bucket_refills_over_time(test_db, _live_app, http_client):
         )
         assert r.status_code == 429
 
-        # Wait for refill (>=1 token regenerated)
-        await asyncio.sleep(0.15)
+        # Wait long enough for refill to guarantee >=1 token (with margin)
+        await asyncio.sleep(0.7)
 
         # Now a request should succeed
         r = await http_client.post(

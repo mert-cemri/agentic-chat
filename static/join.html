@@ -28,12 +28,12 @@
 </head>
 <body>
 <h1>Join the Relay</h1>
-<p>You've been invited as <span class="peer">{peer_name}</span>.</p>
+<p>You've been invited as owner <span class="peer">{owner_name}</span>.</p>
 
 <div class="step">
-<h3>Step 1 — Run this once (any terminal, any machine)</h3>
+<h3>Step 1 — Run this on each machine (edit the name per session)</h3>
 <div class="cmd" id="cmd">{mcp_command}<button onclick="navigator.clipboard.writeText(document.getElementById('cmd').textContent.replace('Copy','').trim())">Copy</button></div>
-<p class="info">This is your identity. Use the same token on all your machines and sessions — no need to create a new one each time.</p>
+<p class="info">One token, many sessions. Set <code>X-Peer-Name</code> to <code>{owner_name}</code> or to something starting with <code>{owner_name}-</code> (for example <code>{owner_name}-laptop</code>, <code>{owner_name}-desktop</code>) so each session shows up distinctly on the dashboard.</p>
 </div>
 
 <div class="step">
@@ -43,7 +43,7 @@
 </div>
 
 <div class="note">
-<strong>Your token = your identity.</strong> Don't share this link — anyone with it can act as {peer_name}.
+<strong>Your token = your account.</strong> Don't share this link — anyone with it can act as any <code>{owner_name}</code> session.
 Bookmark the dashboard at <code>{dashboard_url}</code> to watch conversations live.
 </div>
 </body>
